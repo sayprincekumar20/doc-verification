@@ -22,6 +22,11 @@ tools. See `docs/reading.md` and `docs/extraction.md`.
 
 Next: Phase 1D (cross-document checks and proposed CRM changes vs the Account snapshot).
 
+## Test on a customer
+
+See `docs/testing-a-customer.md`: fetch an Account's documents, run `scripts/try_extraction.py`,
+label results into the gold set, measure with `scripts/evaluate_extraction.py`.
+
 ## Zoho side
 
 - `docs/zoho-api.md`: the exact Zoho API calls the engine makes.
