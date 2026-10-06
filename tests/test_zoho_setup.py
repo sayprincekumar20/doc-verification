@@ -174,3 +174,9 @@ def test_scopes_command(capsys):
     assert zoho_auth.main(["scopes"]) == 0
     out = capsys.readouterr().out.strip()
     assert out.startswith("ZohoCRM.modules.accounts.READ,") and " " not in out
+
+
+def test_env_file_with_windows_bom(tmp_path):
+    path = tmp_path / ".env"
+    path.write_bytes("\ufeffZOHO_CLIENT_ID=1000.CLIENT\r\nZOHO_CLIENT_SECRET=s\r\n".encode())
+    assert read_env(path)["ZOHO_CLIENT_ID"] == "1000.CLIENT"

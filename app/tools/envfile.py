@@ -7,7 +7,8 @@ from pathlib import Path
 def read_env(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     if path.exists():
-        for line in path.read_text().splitlines():
+        # utf-8-sig: tolerate the byte-order mark some Windows editors add
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
@@ -22,7 +23,7 @@ def read_env(path: Path) -> dict[str, str]:
 
 
 def set_env_value(path: Path, key: str, value: str) -> None:
-    lines = path.read_text().splitlines() if path.exists() else []
+    lines = path.read_text(encoding="utf-8-sig").splitlines() if path.exists() else []
     for i, line in enumerate(lines):
         if line.strip().startswith(f"{key}="):
             lines[i] = f"{key}={value}"
