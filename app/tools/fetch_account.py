@@ -9,6 +9,8 @@ Creates samples/<account_id>/ with:
     files/             every document file
     manifest.json      one entry per file: source, name, type, size, sha256, status
 The samples/ folder is git-ignored: it holds real customer data.
+
+Needs no database libraries, so it also runs on locked-down Windows PCs.
 """
 
 import argparse
@@ -21,8 +23,8 @@ from pathlib import Path
 
 import httpx
 
-from app.pipeline.collect import MODULE, discover_sources
 from app.pipeline.file_checks import check_file
+from app.pipeline.sources import MODULE, discover_sources
 from app.tools.envfile import read_env
 from app.tools.zoho_auth import build_client, build_settings
 from app.zoho.errors import FileTooLargeError, ZohoError

@@ -100,3 +100,10 @@ Client Secret in the API Console if it was exposed.
 | `INVALID_TOKEN` (401) | Access token expired | Handled automatically (one refresh + retry) |
 | Token refresh blocked ~10 min | Too many refreshes | Wait; tokens are cached to avoid this |
 | `NO_PERMISSION` (403) | The integration user can't see that record/module | Use an admin/integration user |
+
+## Windows: "An Application Control policy has blocked this file"
+
+Some company PCs (Smart App Control / WDAC) block compiled Python libraries such as SQLAlchemy's
+DLLs. The setup scripts (`zoho_auth.py`, `fetch_account.py`) don't use any database library, so they
+run anyway. To run the full engine or the test suite on such a PC, use Docker Desktop or WSL
+(Linux), which is also how production runs, or ask IT to allow the project's `.venv` folder.

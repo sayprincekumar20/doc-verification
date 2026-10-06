@@ -21,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.domain import DocumentSource  # noqa: F401  (re-exported for callers)
 
 
 def utcnow() -> datetime:
@@ -37,12 +38,6 @@ class JobStatus(enum.StrEnum):
 
 ACTIVE_JOB_STATUSES = (JobStatus.QUEUED, JobStatus.COLLECTING)
 _ACTIVE_SQL = "status IN ('QUEUED', 'COLLECTING')"
-
-
-class DocumentSource(enum.StrEnum):
-    ATTACHMENT = "ATTACHMENT"            # Account > Attachments related list
-    FILE_FIELD = "FILE_FIELD"            # Account fileupload fields (Business_Permit, ...)
-    NOTE_ATTACHMENT = "NOTE_ATTACHMENT"  # files attached to the Account's Notes
 
 
 class DocumentStatus(enum.StrEnum):
