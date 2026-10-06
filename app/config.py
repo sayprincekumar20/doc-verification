@@ -65,6 +65,12 @@ class Settings(BaseSettings):
 
     max_file_bytes: int = 25 * 1024 * 1024
 
+    # Phase 1C: vision-model extraction. "none" stops jobs after reading.
+    extraction_provider: str = "none"          # anthropic | openai | none
+    extraction_model: str | None = None        # default for anthropic: claude-sonnet-5-5
+    anthropic_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+
     sentry_dsn: str | None = None
 
 

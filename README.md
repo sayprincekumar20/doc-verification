@@ -2,8 +2,9 @@
 
 FastAPI engine that reads customer documents from Zoho CRM. Reviewers approve its results inside
 Zoho CRM. This release covers **Phase 0 (foundation)**, **Phase 1A (document collection)** and
-**Phase 1B (reading: format conversion, photo cleanup, OCR, classification)** with the Phase 1E
-evaluation tool. See `docs/reading.md`.
+**Phase 1B (reading: format conversion, photo cleanup, OCR, classification)**, **Phase 1C
+(key-value extraction with a vision model, grounded against OCR)** and the Phase 1E evaluation
+tools. See `docs/reading.md` and `docs/extraction.md`.
 
 ## What works now
 
@@ -19,7 +20,7 @@ evaluation tool. See `docs/reading.md`.
 - Zoho calls retry on rate limits (429) and server errors, and refresh the access token automatically.
 - Logs are JSON and mask TINs and OAuth tokens.
 
-Next: Phase 1C (key-value extraction with a vision model, cross-checked against the OCR text).
+Next: Phase 1D (cross-document checks and proposed CRM changes vs the Account snapshot).
 
 ## Zoho side
 
@@ -156,7 +157,9 @@ Tests use SQLite and a fake Zoho CRM; no network or credentials needed.
 | COLLECTING | Downloading documents from Zoho |
 | COLLECTED | At least one usable document stored; reading queued |
 | READING | OCR + classification running |
-| READ | Every stored file has pages, text, quality and document type |
+| READ | Every stored file has pages, text, quality and document type (final if `EXTRACTION_PROVIDER=none`) |
+| EXTRACTING | Vision model extracting fields |
+| EXTRACTED | Every document has normalized, grounded, validated fields |
 | NO_DOCUMENTS | Nothing usable on the account |
 | FAILED | Zoho unreachable after retries, auth problem, or unexpected error (see `error`) |
 

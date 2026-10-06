@@ -5,8 +5,10 @@ from datetime import UTC, datetime
 from app.config import get_settings
 from app.db.models import JobStatus, VerificationJob
 from app.db.session import session_scope
+from app.extraction.providers import TransientExtractionError, build_provider
 from app.logging import setup_logging
 from app.pipeline.collect import collect_job
+from app.pipeline.extract import extract_job
 from app.pipeline.read import read_job
 from app.services.audit import record_event
 from app.storage.base import build_storage
@@ -68,8 +70,45 @@ def read_documents(job_id: str) -> str:
             if job is None or job.status not in (JobStatus.COLLECTED, JobStatus.READING):
                 return job.status if job else "missing"
             read_job(db, job, build_storage(get_settings()))
-            return job.status
+            status = job.status
+        if status == JobStatus.READ and get_settings().extraction_provider != "none":
+            with session_scope() as db:
+                db.get(VerificationJob, jid).status = JobStatus.EXTRACTING
+            extract_documents.delay(job_id)  # Phase 1C
+            return JobStatus.EXTRACTING
+        return status
     except Exception as exc:
         log.exception("Reading crashed", extra={"job_id": job_id})
         _fail(jid, f"Reading failed: {type(exc).__name__}: {exc}")
+    return JobStatus.FAILED
+
+
+def build_vision_provider():
+    s = get_settings()
+    key = {"anthropic": s.anthropic_api_key, "openai": s.openai_api_key}.get(
+        s.extraction_provider)
+    return build_provider(s.extraction_provider, key.get_secret_value() if key else None,
+                          s.extraction_model)
+
+
+@celery_app.task(bind=True, name="extract_documents", max_retries=5, soft_time_limit=1800)
+def extract_documents(self, job_id: str) -> str:
+    """Phase 1C: vision-model extraction, grounded against OCR text (cached per content)."""
+    setup_logging(get_settings().log_level)
+    jid = uuid.UUID(job_id)
+    try:
+        provider = build_vision_provider()
+        with session_scope() as db:
+            job = db.get(VerificationJob, jid)
+            if job is None or job.status != JobStatus.EXTRACTING:
+                return job.status if job else "missing"
+            extract_job(db, job, build_storage(get_settings()), provider)
+            return job.status
+    except TransientExtractionError as exc:
+        if self.request.retries < 5:
+            raise self.retry(exc=exc, countdown=min(60 * 2**self.request.retries, 1800)) from exc
+        _fail(jid, f"AI provider unavailable after retries: {exc}")
+    except Exception as exc:
+        log.exception("Extraction crashed", extra={"job_id": job_id})
+        _fail(jid, f"Extraction failed: {type(exc).__name__}: {exc}")
     return JobStatus.FAILED

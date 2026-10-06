@@ -33,14 +33,16 @@ class JobStatus(enum.StrEnum):
     COLLECTING = "COLLECTING"
     COLLECTED = "COLLECTED"          # documents stored, reading queued
     READING = "READING"              # OCR + classification running
-    READ = "READ"                    # every stored file has pages + text (extraction is next)
+    READ = "READ"                    # pages + text ready; final when extraction is disabled
+    EXTRACTING = "EXTRACTING"        # vision model extracting key-value fields
+    EXTRACTED = "EXTRACTED"          # every document has normalized, grounded fields
     NO_DOCUMENTS = "NO_DOCUMENTS"    # nothing usable found on the account
     FAILED = "FAILED"
 
 
 ACTIVE_JOB_STATUSES = (JobStatus.QUEUED, JobStatus.COLLECTING, JobStatus.COLLECTED,
-                       JobStatus.READING)
-_ACTIVE_SQL = "status IN ('QUEUED', 'COLLECTING', 'COLLECTED', 'READING')"
+                       JobStatus.READING, JobStatus.EXTRACTING)
+_ACTIVE_SQL = "status IN ('QUEUED', 'COLLECTING', 'COLLECTED', 'READING', 'EXTRACTING')"
 
 
 class DocumentStatus(enum.StrEnum):
@@ -191,4 +193,29 @@ class FilePage(Base):
     type_signals: Mapped[list | None] = mapped_column(JSON)
     image_key: Mapped[str] = mapped_column(String(512))       # cleaned page image in storage
     seconds: Mapped[float] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DocumentExtraction(Base):
+    """Fields extracted from one file's content by one extraction version
+    (prompt + provider/model + reading pipeline). Cached like readings."""
+
+    __tablename__ = "document_extractions"
+
+    sha256: Mapped[str] = mapped_column(ForeignKey("stored_files.sha256"), primary_key=True)
+    extraction_version: Mapped[str] = mapped_column(String(160), primary_key=True)
+    status: Mapped[str] = mapped_column(String(16))        # EXTRACTED | FAILED | SKIPPED
+    error: Mapped[str | None] = mapped_column(Text)
+    expected_type: Mapped[str | None] = mapped_column(String(32))
+    model_type: Mapped[str | None] = mapped_column(String(32))
+    document_type: Mapped[str | None] = mapped_column(String(32))
+    fields: Mapped[dict | None] = mapped_column(JSON)      # name -> value/normalized/grounding/...
+    issues: Mapped[list | None] = mapped_column(JSON)
+    validity_status: Mapped[str | None] = mapped_column(String(16))
+    valid_until: Mapped[str | None] = mapped_column(String(10))
+    model: Mapped[str | None] = mapped_column(String(80))
+    input_tokens: Mapped[int] = mapped_column(default=0)
+    output_tokens: Mapped[int] = mapped_column(default=0)
+    calls: Mapped[int] = mapped_column(default=0)
+    seconds: Mapped[float | None] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
