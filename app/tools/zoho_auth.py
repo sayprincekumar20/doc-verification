@@ -160,6 +160,9 @@ def main(argv: list[str] | None = None) -> int:
     te.add_argument("--account-id", help="also check Notes/Attachments for this Account")
     sub.add_parser("revoke", help="revoke the refresh token in .env")
     args = parser.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
 
     commands = {"scopes": cmd_scopes, "exchange-code": cmd_exchange, "test": cmd_test,
                 "revoke": cmd_revoke}

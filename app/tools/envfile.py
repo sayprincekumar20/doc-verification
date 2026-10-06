@@ -30,7 +30,7 @@ def set_env_value(path: Path, key: str, value: str) -> None:
             break
     else:
         lines.append(f"{key}={value}")
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     try:
         path.chmod(0o600)  # only the owner can read secrets
     except OSError:

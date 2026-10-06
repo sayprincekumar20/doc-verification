@@ -46,7 +46,8 @@ def fetch(account_id: str, out_dir: Path, env_path: Path,
     notes = client.list_notes(MODULE, account_id)
     attachments = client.list_attachments(MODULE, account_id)
     for name, data in (("account", account), ("notes", notes), ("attachments", attachments)):
-        (target / f"{name}.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        (target / f"{name}.json").write_text(
+            json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     entries = []
     for ref in discover_sources(client, account_id, account, settings,
@@ -69,7 +70,8 @@ def fetch(account_id: str, out_dir: Path, env_path: Path,
 
     manifest = {"account_id": account_id, "account_name": account.get("Account_Name"),
                 "fetched_at": datetime.now(UTC).isoformat(), "files": entries}
-    (target / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+    (target / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     return manifest
 
 
@@ -79,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", default="samples")
     parser.add_argument("--env", default=".env")
     args = parser.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")  # Windows consoles may lack e.g. "₱"
     try:
         manifest = fetch(args.account_id, Path(args.out), Path(args.env))
     except ZohoError as exc:
