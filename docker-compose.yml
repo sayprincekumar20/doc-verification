@@ -1,0 +1,50 @@
+# Local development stack. In production, Postgres + file storage come from Supabase
+# (set DATABASE_URL and STORAGE_BACKEND=s3), and only api + worker + redis run on the VPS.
+services:
+  api:
+    build: .
+    env_file: .env
+    ports: ["8000:8000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+    volumes: ["files:/data/files"]
+    restart: unless-stopped
+
+  worker:
+    build: .
+    env_file: .env
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=INFO",
+              "--concurrency=2", "-Q", "verification"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+    volumes: ["files:/data/files"]
+    restart: unless-stopped
+
+  migrate:
+    build: .
+    env_file: .env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dv
+      POSTGRES_PASSWORD: dv
+      POSTGRES_DB: dv
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dv"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  files:
+  pgdata:

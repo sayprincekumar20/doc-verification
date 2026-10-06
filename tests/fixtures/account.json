@@ -1,0 +1,52 @@
+{
+  "data": [
+    {
+      "Owner": {
+        "name": "MARK FERNAN PEDRON",
+        "id": "5906238000012869001",
+        "email": "mark.pedron@rareglobalfood.com"
+      },
+      "Customer_Status": "Active",
+      "Shipping_Street1": "Purok 1 Brgy. Puypuy, Bay",
+      "Currency": "PHP",
+      "Lead_Category": "Trader",
+      "id": "5906238000061698030",
+      "Business_registration": null,
+      "Created_Time": "2026-01-12T13:49:27+08:00",
+      "Owner_Name": "MARK FERNAN PEDRON",
+      "Delivery_Permit": [
+        "No Permits Needed"
+      ],
+      "Billing_Province": "Laguna",
+      "Invoice_Company_Name": "WINNER MEAT SHOP",
+      "Created_By": {
+        "name": "ALEEZA JOY MENDOZA",
+        "id": "5906238000014626001",
+        "email": "aj@rareglobalfood.com"
+      },
+      "General_Information_Sheet": null,
+      "Shipping_Street": "Purok 1 Brgy. Puypuy, Bay",
+      "Shipping_State": "Laguna",
+      "BIR_Registration_COR": null,
+      "Account_Name": "WINNER MEAT SHOP",
+      "Shipping_Province": "Laguna",
+      "Credit_Terms": "Cash On Delivery",
+      "Email": null,
+      "Billing_Street": "Purok 1 Brgy. Puypuy, Bay",
+      "Inventory_Customer_Number": "RGFC-02458",
+      "Type_of_Business_Organization": null,
+      "Business_Style": null,
+      "Modified_By": {
+        "name": "DEXTER JAY CANCINO",
+        "id": "5906238000020348001",
+        "email": "dexter@rareglobalfood.com"
+      },
+      "Modified_Time": "2026-09-21T17:19:05+08:00",
+      "Tax_Identification_Number_TIN": null,
+      "Billing_State": "Laguna",
+      "Business_Permit": null,
+      "Corp_Tax_Cert_No": null,
+      "Special_Permit": false
+    }
+  ]
+}

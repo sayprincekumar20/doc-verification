@@ -1,0 +1,23 @@
+// Standalone function: dv_check_documents
+// Argument: account_id (String)
+// Counts files in the Attachments related list + the four fileupload fields.
+// (Note attachments are found by the engine itself.)
+string standalone.dv_check_documents(String account_id)
+{
+    count = 0;
+    attachments = zoho.crm.getRelatedRecords("Attachments", "Accounts", account_id.toLong());
+    if (attachments != null)
+    {
+        count = attachments.size();
+    }
+    rec = zoho.crm.getRecordById("Accounts", account_id.toLong());
+    for each fld in {"BIR_Registration_COR", "Business_registration", "Business_Permit", "General_Information_Sheet"}
+    {
+        val = rec.get(fld);
+        if (val != null && val.size() > 0)
+        {
+            count = count + val.size();
+        }
+    }
+    return {"attachment_count": count}.toString();
+}

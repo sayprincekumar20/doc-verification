@@ -1,0 +1,43 @@
+// Standalone function: dv_trigger_verification
+// Arguments: account_id (String), reason (String), attachment_count (Int),
+//            user_id (String), user_email (String), requested_at (String)
+// Org variables: dv_engine_url (e.g. https://engine.example.com), dv_engine_api_key
+string standalone.dv_trigger_verification(String account_id, String reason, Int attachment_count, String user_id, String user_email, String requested_at)
+{
+    rec = zoho.crm.getRecordById("Accounts", account_id.toLong());
+
+    requested_by = Map();
+    requested_by.put("id", user_id);
+    requested_by.put("email", user_email);
+
+    payload = Map();
+    payload.put("account_id", account_id);
+    payload.put("customer_number", ifnull(rec.get("Inventory_Customer_Number"), ""));
+    payload.put("reason", ifnull(reason, ""));
+    payload.put("document_status", if(attachment_count > 0, "YES", "NO"));
+    payload.put("attachment_count", attachment_count);
+    payload.put("requested_by", requested_by);
+    payload.put("requested_at", requested_at);
+    payload.put("source", "crm_button");
+
+    resp = invokeurl
+    [
+        url: zoho.crm.getOrgVariable("dv_engine_url") + "/v1/jobs"
+        type: POST
+        parameters: payload.toString()
+        headers: {"Content-Type": "application/json", "X-API-Key": zoho.crm.getOrgVariable("dv_engine_api_key")}
+        detailed: true
+    ];
+
+    code = resp.get("responseCode");
+    body = resp.get("responseText");
+    if (code != 200 && code != 202)
+    {
+        return {"message": "Could not start verification (engine returned " + code + "). Please try again or contact admin."}.toString();
+    }
+    // Optional, after the Account fields exist (Phase 2):
+    // zoho.crm.updateRecord("Accounts", account_id.toLong(),
+    //     {"Verification_Status": "In Progress", "Last_Verification_Reason": ifnull(reason, ""),
+    //      "Last_Verification_Job": body.get("job_id")});
+    return {"message": body.get("message")}.toString();
+}
