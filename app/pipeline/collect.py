@@ -12,6 +12,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -54,12 +55,21 @@ def _who(value: Any) -> str | None:
 
 
 def discover_sources(
-    client: ZohoClient, account_id: str, account: dict[str, Any], settings: Settings
+    client: ZohoClient,
+    account_id: str,
+    account: dict[str, Any],
+    settings: Settings,
+    attachments: list[dict[str, Any]] | None = None,
+    notes: list[dict[str, Any]] | None = None,
 ) -> list[SourceRef]:
     limit = settings.max_file_bytes
     refs: list[SourceRef] = []
+    if attachments is None:
+        attachments = client.list_attachments(MODULE, account_id)
+    if notes is None:
+        notes = client.list_notes(MODULE, account_id)
 
-    for att in client.list_attachments(MODULE, account_id):
+    for att in attachments:
         att_id = str(att["id"])
         refs.append(SourceRef(
             source=DocumentSource.ATTACHMENT,
@@ -72,18 +82,24 @@ def discover_sources(
 
     for field_name in settings.zoho_file_fields:
         for item in account.get(field_name) or []:
+            attachment_id = item.get("attachment_Id")
             file_id = item.get("File_Id__s")
-            if not file_id:
+            if attachment_id:
+                download = partial(client.download_field_attachment, MODULE, account_id,
+                                   str(attachment_id), limit)
+            elif file_id:
+                download = partial(client.download_file, file_id, limit)
+            else:
                 continue
             refs.append(SourceRef(
                 source=DocumentSource.FILE_FIELD,
                 source_field=field_name,
-                file_ref=str(file_id),
+                file_ref=str(attachment_id or file_id),
                 file_name=item.get("File_Name__s"),
-                download=lambda f=file_id: client.download_file(f, limit),
+                download=download,
             ))
 
-    for note in client.list_notes(MODULE, account_id):
+    for note in notes:
         note_id = str(note["id"])
         for att in note.get("$attachments") or []:
             att_id = str(att["id"])

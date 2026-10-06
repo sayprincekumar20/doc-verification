@@ -1,0 +1,319 @@
+{
+  "info": {
+    "_postman_id": "8c5099df-def1-424d-9e51-1f2cdba49854",
+    "name": "Doc Verification - Zoho CRM",
+    "description": "Zoho CRM calls used by the document verification engine. Select the 'Zoho CRM (Doc Verification)' environment. The collection pre-request script refreshes the access token automatically. See docs/zoho-auth.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-refreshes the Zoho access token (max once per ~55 min).",
+          "// Skipped for requests to the accounts server (token exchange/refresh/revoke).",
+          "if (pm.request.url.toString().includes(\"{{zoho_accounts_url}}\") ||",
+          "    pm.request.url.getHost().startsWith(\"accounts.zoho\")) { return; }",
+          "",
+          "const expiresAt = Number(pm.environment.get(\"zoho_token_expires_at\") || 0);",
+          "if (pm.environment.get(\"zoho_access_token\") && Date.now() < expiresAt) { return; }",
+          "",
+          "pm.sendRequest({",
+          "  url: pm.environment.get(\"zoho_accounts_url\") + \"/oauth/v2/token\",",
+          "  method: \"POST\",",
+          "  header: { \"Content-Type\": \"application/x-www-form-urlencoded\" },",
+          "  body: { mode: \"urlencoded\", urlencoded: [",
+          "    { key: \"grant_type\", value: \"refresh_token\" },",
+          "    { key: \"client_id\", value: pm.environment.get(\"zoho_client_id\") },",
+          "    { key: \"client_secret\", value: pm.environment.get(\"zoho_client_secret\") },",
+          "    { key: \"refresh_token\", value: pm.environment.get(\"zoho_refresh_token\") }",
+          "  ]}",
+          "}, (err, res) => {",
+          "  const body = res ? res.json() : {};",
+          "  if (err || !body.access_token) { console.log(\"Zoho token refresh failed\", err || body); return; }",
+          "  pm.environment.set(\"zoho_access_token\", body.access_token);",
+          "  pm.environment.set(\"zoho_token_expires_at\", String(Date.now() + (body.expires_in - 300) * 1000));",
+          "});"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Setup (one time)",
+      "item": [
+        {
+          "name": "Exchange grant code for refresh token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{zoho_client_id}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{zoho_client_secret}}"
+                },
+                {
+                  "key": "code",
+                  "value": "{{zoho_grant_code}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{zoho_accounts_url}}/oauth/v2/token"
+            },
+            "description": "Paste the Self Client grant code into the zoho_grant_code environment variable, then send within its validity window. Saves the refresh token into the environment."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.test(\"refresh token received\", () => pm.expect(body.refresh_token).to.be.a(\"string\"));",
+                  "if (body.refresh_token) {",
+                  "  pm.environment.set(\"zoho_refresh_token\", body.refresh_token);",
+                  "  pm.environment.set(\"zoho_access_token\", body.access_token);",
+                  "  pm.environment.set(\"zoho_token_expires_at\", String(Date.now() + (body.expires_in - 300) * 1000));",
+                  "  pm.environment.set(\"zoho_grant_code\", \"\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh access token (manual)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "refresh_token"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{zoho_client_id}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{zoho_client_secret}}"
+                },
+                {
+                  "key": "refresh_token",
+                  "value": "{{zoho_refresh_token}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{zoho_accounts_url}}/oauth/v2/token"
+            },
+            "description": "Normally not needed: the collection script does this automatically. Zoho allows about 10 refreshes per 10 minutes per refresh token."
+          }
+        },
+        {
+          "name": "Revoke refresh token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "token",
+                  "value": "{{zoho_refresh_token}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{zoho_accounts_url}}/oauth/v2/token/revoke"
+            },
+            "description": "Use if a refresh token was exposed. Generate a new grant code afterwards."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Checks",
+      "item": [
+        {
+          "name": "Current user (who the engine acts as)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/users?type=CurrentUser",
+              "query": [
+                {
+                  "key": "type",
+                  "value": "CurrentUser"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Accounts field metadata",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/settings/fields?module=Accounts",
+              "query": [
+                {
+                  "key": "module",
+                  "value": "Accounts"
+                }
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Account data (same calls as the engine)",
+      "item": [
+        {
+          "name": "Get Account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/Accounts/{{account_id}}"
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Notes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/Accounts/{{account_id}}/Notes?fields=id,Parent_Id,Owner,Created_By,Modified_By,Created_Time,Modified_Time,Note_Title,Note_Content,$attachments",
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "id,Parent_Id,Owner,Created_By,Modified_By,Created_Time,Modified_Time,Note_Title,Note_Content,$attachments"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Attachments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/Accounts/{{account_id}}/Attachments?fields=id,File_Name,File_Size,Created_Time,Modified_Time,Owner,Created_By,Modified_By,Parent_Id,Attachment_Type",
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "id,File_Name,File_Size,Created_Time,Modified_Time,Owner,Created_By,Modified_By,Parent_Id,Attachment_Type"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Download Attachment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/Accounts/{{account_id}}/Attachments/{{attachment_id}}"
+            },
+            "description": "Set attachment_id from the Get Attachments response. Use 'Send and Download' to save the file."
+          }
+        },
+        {
+          "name": "Download fileupload field file",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/Accounts/{{account_id}}/actions/download_fields_attachment?fields_attachment_id={{field_attachment_id}}",
+              "query": [
+                {
+                  "key": "fields_attachment_id",
+                  "value": "{{field_attachment_id}}"
+                }
+              ]
+            },
+            "description": "field_attachment_id = the attachment_Id inside a fileupload field value (e.g. Business_Permit) from Get Account."
+          }
+        },
+        {
+          "name": "Download Note attachment",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Zoho-oauthtoken {{zoho_access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{zoho_api_domain}}/crm/v8/Notes/{{note_id}}/Attachments/{{attachment_id}}"
+            },
+            "description": "Only when a note's $attachments is not null."
+          }
+        }
+      ]
+    }
+  ]
+}

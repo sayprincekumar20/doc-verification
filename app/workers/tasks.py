@@ -1,9 +1,6 @@
 import logging
 import uuid
 from datetime import UTC, datetime
-from functools import lru_cache
-
-import redis
 
 from app.config import get_settings
 from app.db.models import JobStatus, VerificationJob
@@ -13,19 +10,11 @@ from app.pipeline.collect import collect_job
 from app.services.audit import record_event
 from app.storage.base import build_storage
 from app.workers.celery_app import celery_app
-from app.zoho.auth import RedisTokenCache, ZohoTokenProvider
-from app.zoho.client import ZohoClient
 from app.zoho.errors import ZohoAuthError, ZohoNotFoundError, ZohoTransientError
+from app.zoho.factory import get_zoho_client
 
 log = logging.getLogger(__name__)
 MAX_RETRIES = 5
-
-
-@lru_cache
-def _zoho_client() -> ZohoClient:
-    s = get_settings()
-    cache = RedisTokenCache(redis.Redis.from_url(s.redis_url))
-    return ZohoClient(s, ZohoTokenProvider(s, cache))
 
 
 def _fail(job_id: uuid.UUID, message: str) -> None:
@@ -50,7 +39,7 @@ def collect_documents(self, job_id: str) -> str:
                 return "missing"
             if job.status not in (JobStatus.QUEUED, JobStatus.COLLECTING):
                 return job.status  # already processed: duplicate delivery is a no-op
-            collect_job(db, job, _zoho_client(), build_storage(settings), settings)
+            collect_job(db, job, get_zoho_client(), build_storage(settings), settings)
             return job.status
     except ZohoTransientError as exc:
         if self.request.retries < MAX_RETRIES:

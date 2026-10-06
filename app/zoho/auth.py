@@ -105,3 +105,38 @@ class ZohoTokenProvider:
         self._cache.set(body["access_token"], ttl)
         log.info("Zoho access token refreshed")
         return body["access_token"]
+
+
+# ---------- one-time setup helpers (used by scripts/zoho_auth.py) ----------
+
+
+def exchange_grant_code(
+    accounts_url: str, client_id: str, client_secret: str, code: str,
+    http: httpx.Client | None = None,
+) -> dict:
+    """Exchange a Self Client grant code for tokens. Returns Zoho's JSON
+    ({access_token, refresh_token, api_domain, expires_in, ...})."""
+    http = http or httpx.Client(timeout=30)
+    resp = http.post(f"{accounts_url}/oauth/v2/token", data={
+        "grant_type": "authorization_code",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code.strip(),
+    })
+    body = resp.json() if resp.content else {}
+    if resp.status_code != 200 or "refresh_token" not in body:
+        hint = {
+            "invalid_code": "the grant code expired or was already used; generate a new one",
+            "invalid_client": "wrong client id/secret, or wrong accounts URL for your data center",
+        }.get(str(body.get("error")), "")
+        raise ZohoAuthError(f"Grant code exchange failed: {body.get('error', resp.status_code)}"
+                            + (f" ({hint})" if hint else ""))
+    return body
+
+
+def revoke_refresh_token(accounts_url: str, refresh_token: str,
+                         http: httpx.Client | None = None) -> None:
+    http = http or httpx.Client(timeout=30)
+    resp = http.post(f"{accounts_url}/oauth/v2/token/revoke", data={"token": refresh_token})
+    if resp.status_code != 200:
+        raise ZohoAuthError(f"Revoke failed: HTTP {resp.status_code}")

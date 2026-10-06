@@ -54,19 +54,20 @@ migrations/            Alembic migrations
 tests/                 pytest suite with a fake Zoho CRM
 ```
 
-## 1. Create Zoho API credentials (one time)
+## 1. Connect to Zoho CRM (one time)
 
-1. Go to the Zoho API Console for the US data center (https://api-console.zoho.com) and create a
-   **Self Client**.
-2. Generate a grant code with these scopes:
-   `ZohoCRM.modules.accounts.READ,ZohoCRM.modules.notes.READ,ZohoCRM.modules.attachments.READ,ZohoCRM.settings.fields.READ`
-   plus the scope Zoho's "Download File" API requires for fileupload fields (check that API's
-   docs page). Later phases add write scopes.
-3. Exchange the grant code for a **refresh token** (POST to
-   `https://accounts.zoho.com/oauth/v2/token` with `grant_type=authorization_code`).
-4. Put the client id, client secret and refresh token in `.env`. Never commit `.env`.
+Full guide: `docs/zoho-auth.md`. In short:
 
-Use the **Zoho CRM Sandbox** credentials for staging and separate production credentials for prod.
+```bash
+cp .env.example .env
+python scripts/zoho_auth.py scopes          # scopes to paste in the API Console
+# API Console > Self Client: put Client ID/Secret in .env, generate a grant code
+python scripts/zoho_auth.py exchange-code   # saves ZOHO_REFRESH_TOKEN to .env
+python scripts/zoho_auth.py test --account-id <account_id>
+python scripts/fetch_account.py <account_id>   # sample data -> samples/ (git-ignored)
+```
+
+Postman: import the collection and environment from `postman/`; tokens refresh automatically.
 
 ## 2. Run locally
 
@@ -117,6 +118,12 @@ Check it:
 curl -H "X-API-Key: $API_KEY" http://localhost:8000/v1/jobs/<job_id>
 ```
 
+Check the engine's Zoho connection:
+
+```bash
+curl -H "X-API-Key: $API_KEY" http://localhost:8000/health/zoho
+```
+
 API docs (non-prod only): http://localhost:8000/docs
 
 ## 3. Run tests
@@ -155,5 +162,6 @@ These follow Zoho's v8 API conventions but should be confirmed with one real acc
 
 - The shape of Note `$attachments` items and the Notes attachment download path
   (`/Notes/{note_id}/Attachments/{attachment_id}`).
-- Fileupload field values use `File_Id__s` / `File_Name__s` and download via `/files?id=`.
+- Fileupload field values carry `attachment_Id` and download via
+  `/Accounts/{id}/actions/download_fields_attachment` (fallback `/files?id={File_Id__s}`).
 - Attachments list field names (`File_Name`, `Created_By`, ...), copied from your working request.

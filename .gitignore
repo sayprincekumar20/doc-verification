@@ -6,3 +6,6 @@ __pycache__/
 .ruff_cache/
 data/
 *.egg-info/
+
+# Real customer documents fetched for testing. Never commit.
+samples/

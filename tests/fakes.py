@@ -6,6 +6,7 @@
 import copy
 import json
 from pathlib import Path
+from urllib.parse import parse_qs
 
 import httpx
 
@@ -36,6 +37,9 @@ class FakeZoho:
         self.calls: list[str] = []
         self.params: list[dict] = []
         self.token_requests = 0
+        self.field_attachments: dict[str, bytes] = {}
+        self.scope_missing_paths: set[str] = set()  # paths answering 401 OAUTH_SCOPE_MISMATCH
+        self.revoked: list[str] = []
 
     @classmethod
     def from_real_responses(cls) -> "FakeZoho":
@@ -51,14 +55,43 @@ class FakeZoho:
         path = request.url.path
         self.calls.append(f"{request.method} {path}")
         self.params.append(dict(request.url.params))
+        if path.endswith("/oauth/v2/token/revoke"):
+            self.revoked.append(parse_qs(request.content.decode()).get("token", [""])[0])
+            return httpx.Response(200, json={"status": "success"})
         if path.endswith("/oauth/v2/token"):
+            form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
+            if form.get("grant_type") == "authorization_code":
+                if form.get("code") != "1000.goodcode":
+                    return httpx.Response(200, json={"error": "invalid_code"})
+                return httpx.Response(200, json={
+                    "access_token": "1000.access", "refresh_token": "1000.refresh.abcdefghijkl",
+                    "api_domain": "https://www.zohoapis.com", "token_type": "Bearer",
+                    "expires_in": 3600})
             self.token_requests += 1
             return httpx.Response(200, json={"access_token": f"tok{self.token_requests}",
                                              "expires_in": 3600})
+        if path in self.scope_missing_paths:
+            return httpx.Response(401, json={"code": "OAUTH_SCOPE_MISMATCH",
+                                             "message": "invalid oauth scope"})
         if self.fail_next:
             return httpx.Response(self.fail_next.pop(0), json={"code": "ERR"})
 
         base = "/crm/v8"
+        if path == f"{base}/users":
+            return httpx.Response(200, json={"users": [{
+                "full_name": "Example Integration", "email": "integration@example.com",
+                "profile": {"name": "Administrator"}, "role": {"name": "CEO"}}]})
+        if path == f"{base}/settings/fields":
+            return httpx.Response(200, json={"fields": [{"api_name": "Account_Name"},
+                                                        {"api_name": "Customer_Status"}]})
+        if path == f"{base}/Accounts":
+            return httpx.Response(200, json={"data": [{"id": ACCOUNT_ID}],
+                                             "info": {"more_records": True}})
+        if path == f"{base}/Accounts/{ACCOUNT_ID}/actions/download_fields_attachment":
+            att = request.url.params.get("fields_attachment_id")
+            if att in self.field_attachments:
+                return httpx.Response(200, content=self.field_attachments[att])
+            return httpx.Response(400, json={"code": "INVALID_DATA"})
         if path == f"{base}/Accounts/{ACCOUNT_ID}":
             return httpx.Response(200, json={"data": [self.account]})
         if path == f"{base}/Accounts/{ACCOUNT_ID}/Attachments":

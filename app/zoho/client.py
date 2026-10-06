@@ -31,6 +31,20 @@ NOTE_FIELDS = (
 )
 
 
+def _error_code(resp: httpx.Response) -> str:
+    try:
+        body = resp.json()
+    except ValueError:
+        return ""
+    return str(body.get("code", "")) if isinstance(body, dict) else ""
+
+
+def _is_token_problem(resp: httpx.Response) -> bool:
+    """401 because the token expired/is invalid (refresh helps), not because a scope is missing
+    (refreshing would waste one of the 10-per-10-minutes token refreshes)."""
+    return _error_code(resp) != "OAUTH_SCOPE_MISMATCH"
+
+
 class ZohoClient:
     def __init__(
         self,
@@ -65,7 +79,7 @@ class ZohoClient:
                 self._sleep(self._backoff(attempt, None))
                 continue
 
-            if resp.status_code == 401 and not refreshed:
+            if resp.status_code == 401 and not refreshed and _is_token_problem(resp):
                 refreshed = True  # token expired/invalid: refresh once and retry
                 continue
             if resp.status_code in _RETRY_STATUS:
@@ -130,6 +144,37 @@ class ZohoClient:
     ) -> bytes:
         return self._download(f"/{module}/{record_id}/Attachments/{attachment_id}", None, max_bytes)
 
+    def download_field_attachment(
+        self, module: str, record_id: str, attachment_id: str, max_bytes: int
+    ) -> bytes:
+        """Download a file from a fileupload/imageupload field.
+
+        GET /{module}/{record_id}/actions/download_fields_attachment?fields_attachment_id={id}
+        Needs only the module READ scope. `attachment_id` is the field value's `attachment_Id`.
+        """
+        return self._download(
+            f"/{module}/{record_id}/actions/download_fields_attachment",
+            {"fields_attachment_id": attachment_id},
+            max_bytes,
+        )
+
     def download_file(self, file_id: str, max_bytes: int) -> bytes:
-        """Download a file stored in a fileupload field (uses its encrypted File_Id__s)."""
+        """Fallback: fetch a Zoho File System file by encrypted id (needs ZohoCRM.Files.READ)."""
         return self._download("/files", {"id": file_id}, max_bytes)
+
+    # ---------- setup checks ----------
+
+    def get_current_user(self) -> dict[str, Any]:
+        body = self._get_json("/users", {"type": "CurrentUser"})
+        users = body.get("users") or []
+        if not users:
+            raise ZohoNotFoundError("Current user not returned")
+        return users[0]
+
+    def count_fields(self, module: str) -> int:
+        return len(self._get_json("/settings/fields", {"module": module}).get("fields") or [])
+
+    def list_records(self, module: str, fields: str, per_page: int = 1) -> list[dict[str, Any]]:
+        return self._get_json(f"/{module}", {"fields": fields, "per_page": per_page}).get(
+            "data"
+        ) or []
