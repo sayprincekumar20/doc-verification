@@ -88,7 +88,7 @@ def build_vision_provider():
     key = {"anthropic": s.anthropic_api_key, "openai": s.openai_api_key}.get(
         s.extraction_provider)
     return build_provider(s.extraction_provider, key.get_secret_value() if key else None,
-                          s.extraction_model)
+                          s.extraction_model, reasoning_effort=s.extraction_reasoning_effort)
 
 
 @celery_app.task(bind=True, name="extract_documents", max_retries=5, soft_time_limit=1800)

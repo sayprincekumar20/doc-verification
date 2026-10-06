@@ -88,27 +88,37 @@ class AnthropicProvider:
 
 
 class OpenAIProvider:
-    """Chat Completions with a strict JSON schema response format."""
+    """Responses API with a strict JSON-schema output format.
+
+    Current OpenAI models (gpt-6-astra, gpt-6.1-sol, gpt-6-luna) are reasoning models: no custom
+    temperature, and hidden reasoning tokens count toward max_output_tokens, so the limit is
+    generous and reasoning effort is kept low (reading a document needs little reasoning).
+    """
 
     name = "openai"
-    URL = "https://api.openai.com/v1/chat/completions"
+    URL = "https://api.openai.com/v1/responses"
 
     def __init__(self, api_key: str, model: str, http: httpx.Client | None = None,
-                 max_tokens: int = 2000):
+                 max_tokens: int = 8000, reasoning_effort: str | None = "low"):
         self.model, self._key, self._max = model, api_key, max_tokens
-        self._http = http or httpx.Client(timeout=120)
+        self._effort = reasoning_effort
+        self._http = http or httpx.Client(timeout=180)
 
     def extract(self, images: list[bytes], prompt: str, schema: dict) -> ModelOutput:
-        content = [{"type": "image_url", "image_url": {
-            "url": f"data:image/jpeg;base64,{_b64(img)}", "detail": "high"}} for img in images]
-        content.append({"type": "text", "text": prompt})
+        content = [{"type": "input_image", "image_url": f"data:image/jpeg;base64,{_b64(img)}",
+                    "detail": "high"} for img in images]
+        content.append({"type": "input_text", "text": prompt})
         body = {
-            "model": self.model, "temperature": 0, "max_completion_tokens": self._max,
-            "messages": [{"role": "system", "content": SYSTEM},
-                         {"role": "user", "content": content}],
-            "response_format": {"type": "json_schema", "json_schema": {
-                "name": "document_fields", "strict": True, "schema": schema}},
+            "model": self.model,
+            "instructions": SYSTEM,
+            "input": [{"role": "user", "content": content}],
+            "max_output_tokens": self._max,
+            "store": False,  # don't keep customer documents on OpenAI's side
+            "text": {"format": {"type": "json_schema", "name": "document_fields",
+                                "strict": True, "schema": schema}},
         }
+        if self._effort:
+            body["reasoning"] = {"effort": self._effort}
         started = time.monotonic()
         try:
             resp = self._http.post(self.URL, json=body,
@@ -117,21 +127,33 @@ class OpenAIProvider:
             raise TransientExtractionError(f"openai network error: {exc}") from exc
         _raise_for(resp, "openai")
         payload = resp.json()
-        choice = payload["choices"][0]["message"]
-        if choice.get("refusal"):
-            raise ExtractionError(f"openai refused: {choice['refusal']}")
+        if payload.get("status") == "incomplete":
+            reason = (payload.get("incomplete_details") or {}).get("reason", "unknown")
+            raise ExtractionError(f"openai response incomplete: {reason}")
+        text, refusal = None, None
+        for item in payload.get("output", []):
+            if item.get("type") != "message":
+                continue  # skip reasoning items
+            for part in item.get("content", []):
+                if part.get("type") == "output_text":
+                    text = part.get("text")
+                elif part.get("type") == "refusal":
+                    refusal = part.get("refusal")
+        if refusal:
+            raise ExtractionError(f"openai refused: {refusal}")
         try:
-            data = json.loads(choice["content"])
+            data = json.loads(text)
         except (TypeError, json.JSONDecodeError) as exc:
             raise ExtractionError("openai returned invalid JSON") from exc
         usage = payload.get("usage", {})
         return ModelOutput(data, payload.get("model", self.model),
-                           usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
+                           usage.get("input_tokens", 0), usage.get("output_tokens", 0),
                            round(time.monotonic() - started, 2), payload)
 
 
 def build_provider(name: str, api_key: str | None, model: str | None,
-                   http: httpx.Client | None = None) -> VisionProvider | None:
+                   http: httpx.Client | None = None,
+                   reasoning_effort: str | None = "low") -> VisionProvider | None:
     if name in ("", "none", None):
         return None
     if not api_key:
@@ -140,6 +162,7 @@ def build_provider(name: str, api_key: str | None, model: str | None,
         return AnthropicProvider(api_key, model or "claude-sonnet-5-5", http)
     if name == "openai":
         if not model:
-            raise ExtractionError("Set EXTRACTION_MODEL for OpenAI (a vision-capable model)")
-        return OpenAIProvider(api_key, model, http)
+            raise ExtractionError("Set EXTRACTION_MODEL for OpenAI, e.g. gpt-6.1-sol or "
+                                  "gpt-6-luna")
+        return OpenAIProvider(api_key, model, http, reasoning_effort=reasoning_effort or None)
     raise ExtractionError(f"Unknown EXTRACTION_PROVIDER: {name}")

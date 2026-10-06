@@ -19,7 +19,13 @@ EXTRACTION_PROVIDER=anthropic
 ANTHROPIC_API_KEY=...
 ```
 
-(or `openai` + `OPENAI_API_KEY` + `EXTRACTION_MODEL`). With `none`, step 3 only reads and
+or for OpenAI:
+
+```
+EXTRACTION_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+EXTRACTION_MODEL=gpt-6.1-sol
+``` With `none`, step 3 only reads and
 classifies.
 
 ## 3. Run extraction and look at the results

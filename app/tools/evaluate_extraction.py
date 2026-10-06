@@ -105,7 +105,8 @@ def main(argv: list[str] | None = None) -> int:
     provider_name = args.provider or env.get("EXTRACTION_PROVIDER", "none")
     key = env.get({"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}.get(
         provider_name, ""), "")
-    provider = build_provider(provider_name, key, args.model or env.get("EXTRACTION_MODEL"))
+    provider = build_provider(provider_name, key, args.model or env.get("EXTRACTION_MODEL"),
+                                  reasoning_effort=env.get("EXTRACTION_REASONING_EFFORT", "low"))
     if provider is None:
         print("Set --provider (or EXTRACTION_PROVIDER in .env) to anthropic or openai.")
         return 2

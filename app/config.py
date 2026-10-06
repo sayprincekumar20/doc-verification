@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     extraction_model: str | None = None        # default for anthropic: claude-sonnet-5-5
     anthropic_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
+    extraction_reasoning_effort: str = "low"   # OpenAI only: none | low | medium | high
 
     sentry_dsn: str | None = None
 

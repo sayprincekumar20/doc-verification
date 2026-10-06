@@ -133,7 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     name = args.provider or env.get("EXTRACTION_PROVIDER", "none")
     key = env.get({"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}.get(name, ""))
     try:
-        provider = build_provider(name, key, args.model or env.get("EXTRACTION_MODEL"))
+        provider = build_provider(name, key, args.model or env.get("EXTRACTION_MODEL"),
+                                  reasoning_effort=env.get("EXTRACTION_REASONING_EFFORT", "low"))
     except ExtractionError as exc:
         print(f"FAIL  {exc}")
         return 2

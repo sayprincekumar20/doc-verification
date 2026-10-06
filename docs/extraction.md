@@ -36,11 +36,26 @@ Results are stored per file content + `extraction_version` (prompt version + pro
 reading version): an unchanged file is never sent to the model twice. Images are sent at most
 1568 px. Token usage is stored per document.
 
+## OpenAI setup
+
+```
+EXTRACTION_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+EXTRACTION_MODEL=gpt-6.1-sol        # or gpt-6-luna (cheapest), gpt-6-astra (most capable)
+EXTRACTION_REASONING_EFFORT=low     # "none" is allowed for gpt-6-luna only
+```
+
+The adapter uses OpenAI's Responses API with a strict JSON schema, `store: false` (documents are
+not kept on OpenAI's side), no temperature (reasoning models don't accept it) and an 8000-token
+output limit (reasoning tokens count toward it). An `incomplete` reply is reported as a failure,
+never half-parsed.
+
 ## Choose a provider: benchmark on the gold set
 
 ```bash
 python scripts/evaluate_extraction.py --gold samples/gold.json --files samples --provider anthropic --out samples/anthropic.json
-python scripts/evaluate_extraction.py --gold samples/gold.json --files samples --provider openai --model <vision model> --out samples/openai.json
+python scripts/evaluate_extraction.py --gold samples/gold.json --files samples --provider openai --model gpt-6-luna --out samples/luna.json
+python scripts/evaluate_extraction.py --gold samples/gold.json --files samples --provider openai --model gpt-6.1-sol --out samples/sol.json
 ```
 
 Compare field accuracy, **wrong but looked confirmed** (must be 0 or near), and tokens (cost).
