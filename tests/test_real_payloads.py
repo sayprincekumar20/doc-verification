@@ -73,7 +73,7 @@ def test_representative_payload_end_to_end(db, settings):
 
 def test_warns_when_customer_number_differs(db, settings):
     job = run_button_flow(db, settings, FakeZoho.from_real_responses(),
-                          customer_number="RGFC-99999")
+                          customer_number="EXAMPLE-999")
     assert [w["code"] for w in job.warnings] == ["CUSTOMER_NUMBER_MISMATCH"]
 
 
