@@ -7,6 +7,7 @@ from app.db.models import JobStatus, VerificationJob
 from app.db.session import session_scope
 from app.logging import setup_logging
 from app.pipeline.collect import collect_job
+from app.pipeline.read import read_job
 from app.services.audit import record_event
 from app.storage.base import build_storage
 from app.workers.celery_app import celery_app
@@ -40,7 +41,10 @@ def collect_documents(self, job_id: str) -> str:
             if job.status not in (JobStatus.QUEUED, JobStatus.COLLECTING):
                 return job.status  # already processed: duplicate delivery is a no-op
             collect_job(db, job, get_zoho_client(), build_storage(settings), settings)
-            return job.status
+            status = job.status
+        if status == JobStatus.COLLECTED:
+            read_documents.delay(job_id)  # Phase 1B
+        return status
     except ZohoTransientError as exc:
         if self.request.retries < MAX_RETRIES:
             raise self.retry(exc=exc, countdown=min(60 * 2**self.request.retries, 1800)) from exc
@@ -50,4 +54,22 @@ def collect_documents(self, job_id: str) -> str:
     except Exception as exc:  # unexpected: record and stop, don't loop
         log.exception("Collection crashed", extra={"job_id": job_id})
         _fail(jid, f"Unexpected error: {type(exc).__name__}: {exc}")
+    return JobStatus.FAILED
+
+
+@celery_app.task(name="read_documents", soft_time_limit=1800)
+def read_documents(job_id: str) -> str:
+    """Phase 1B: OCR + classify every stored file of the job (cached per file content)."""
+    setup_logging(get_settings().log_level)
+    jid = uuid.UUID(job_id)
+    try:
+        with session_scope() as db:
+            job = db.get(VerificationJob, jid)
+            if job is None or job.status not in (JobStatus.COLLECTED, JobStatus.READING):
+                return job.status if job else "missing"
+            read_job(db, job, build_storage(get_settings()))
+            return job.status
+    except Exception as exc:
+        log.exception("Reading crashed", extra={"job_id": job_id})
+        _fail(jid, f"Reading failed: {type(exc).__name__}: {exc}")
     return JobStatus.FAILED

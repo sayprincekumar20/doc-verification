@@ -2,11 +2,13 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
-# OCR engine with English + Filipino data (used from Phase 1B onward).
-# LibreOffice is added in Phase 1B for DOCX/XLSX conversion.
+# OCR (English + Filipino), LibreOffice to convert DOCX/XLSX/DOC/XLS to PDF.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr tesseract-ocr-eng tesseract-ocr-fil \
+        libreoffice-writer-nogui libreoffice-calc-nogui \
     && rm -rf /var/lib/apt/lists/*
+# One OCR thread per worker process: much faster than OpenMP oversubscription on small VPSs.
+ENV OMP_THREAD_LIMIT=1
 
 RUN useradd --create-home --uid 10001 app
 WORKDIR /app

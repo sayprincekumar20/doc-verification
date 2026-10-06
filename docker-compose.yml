@@ -8,7 +8,8 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
-    volumes: ["files:/data/files"]
+    # ./samples is mounted read-only for evaluation runs (docs/reading.md)
+    volumes: ["files:/data/files", "./samples:/app/samples:ro"]
     restart: unless-stopped
 
   worker:

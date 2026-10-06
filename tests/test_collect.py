@@ -75,6 +75,8 @@ def test_no_documents(db, settings):
 def test_rerun_reuses_stored_file(db, settings):
     fake = FakeZoho()
     fake.attachments = [{"id": "1", "name": "a.jpg", "data": JPEG}]
-    run(db, settings, fake)
+    first, _ = run(db, settings, fake)
+    first.status = JobStatus.READ  # finished; the account may be verified again
+    db.commit()
     run(db, settings, fake)
     assert db.query(StoredFile).count() == 1

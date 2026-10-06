@@ -31,13 +31,16 @@ def utcnow() -> datetime:
 class JobStatus(enum.StrEnum):
     QUEUED = "QUEUED"
     COLLECTING = "COLLECTING"
-    COLLECTED = "COLLECTED"          # documents stored; reading starts in Phase 1B
+    COLLECTED = "COLLECTED"          # documents stored, reading queued
+    READING = "READING"              # OCR + classification running
+    READ = "READ"                    # every stored file has pages + text (extraction is next)
     NO_DOCUMENTS = "NO_DOCUMENTS"    # nothing usable found on the account
     FAILED = "FAILED"
 
 
-ACTIVE_JOB_STATUSES = (JobStatus.QUEUED, JobStatus.COLLECTING)
-_ACTIVE_SQL = "status IN ('QUEUED', 'COLLECTING')"
+ACTIVE_JOB_STATUSES = (JobStatus.QUEUED, JobStatus.COLLECTING, JobStatus.COLLECTED,
+                       JobStatus.READING)
+_ACTIVE_SQL = "status IN ('QUEUED', 'COLLECTING', 'COLLECTED', 'READING')"
 
 
 class DocumentStatus(enum.StrEnum):
@@ -142,4 +145,50 @@ class AuditEvent(Base):
     event_type: Mapped[str] = mapped_column(String(64))
     message: Mapped[str] = mapped_column(Text, default="")
     payload: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FileReading(Base):
+    """Result of reading one file's content with one pipeline version. Keyed by content hash,
+    so the same file uploaded again (or re-checked later) is never OCR'd twice."""
+
+    __tablename__ = "file_readings"
+
+    sha256: Mapped[str] = mapped_column(ForeignKey("stored_files.sha256"), primary_key=True)
+    pipeline_version: Mapped[str] = mapped_column(String(32), primary_key=True)
+    status: Mapped[str] = mapped_column(String(16))          # READ | UNREADABLE
+    error: Mapped[str | None] = mapped_column(Text)
+    page_count: Mapped[int] = mapped_column(default=0)
+    document_type: Mapped[str | None] = mapped_column(String(32))  # from the first page
+    type_confidence: Mapped[float | None] = mapped_column()
+    seconds: Mapped[float | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FilePage(Base):
+    __tablename__ = "file_pages"
+    __table_args__ = (UniqueConstraint("sha256", "pipeline_version", "page_number",
+                                       name="uq_file_page"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    sha256: Mapped[str] = mapped_column(ForeignKey("stored_files.sha256"), index=True)
+    pipeline_version: Mapped[str] = mapped_column(String(32))
+    page_number: Mapped[int] = mapped_column()
+    source: Mapped[str] = mapped_column(String(16))           # pdf_text | pdf_scan | image | office
+    text_method: Mapped[str] = mapped_column(String(16))      # text_layer | ocr | ocr+ink
+    text: Mapped[str] = mapped_column(Text)
+    grounding_text: Mapped[str] = mapped_column(Text)
+    ocr_conf: Mapped[float] = mapped_column()
+    word_count: Mapped[int] = mapped_column()
+    quality_label: Mapped[str] = mapped_column(String(16))    # GOOD | FAIR | POOR | UNREADABLE
+    quality_score: Mapped[float] = mapped_column()
+    quality_reasons: Mapped[list | None] = mapped_column(JSON)
+    rotation: Mapped[int] = mapped_column(default=0)
+    cropped: Mapped[bool] = mapped_column(default=False)
+    skew: Mapped[float] = mapped_column(default=0.0)
+    document_type: Mapped[str] = mapped_column(String(32))
+    type_confidence: Mapped[float] = mapped_column()
+    type_signals: Mapped[list | None] = mapped_column(JSON)
+    image_key: Mapped[str] = mapped_column(String(512))       # cleaned page image in storage
+    seconds: Mapped[float] = mapped_column()
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

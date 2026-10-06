@@ -1,7 +1,9 @@
 # Document Verification Engine (Option E)
 
 FastAPI engine that reads customer documents from Zoho CRM. Reviewers approve its results inside
-Zoho CRM. This release covers **Phase 0 (foundation)** and **Phase 1A (document collection)**.
+Zoho CRM. This release covers **Phase 0 (foundation)**, **Phase 1A (document collection)** and
+**Phase 1B (reading: format conversion, photo cleanup, OCR, classification)** with the Phase 1E
+evaluation tool. See `docs/reading.md`.
 
 ## What works now
 
@@ -17,7 +19,7 @@ Zoho CRM. This release covers **Phase 0 (foundation)** and **Phase 1A (document 
 - Zoho calls retry on rate limits (429) and server errors, and refresh the access token automatically.
 - Logs are JSON and mask TINs and OAuth tokens.
 
-Next: Phase 1B (format conversion, image cleanup, OCR).
+Next: Phase 1C (key-value extraction with a vision model, cross-checked against the OCR text).
 
 ## Zoho side
 
@@ -146,13 +148,15 @@ Tests use SQLite and a fake Zoho CRM; no network or credentials needed.
 - Run `alembic upgrade head` on each deploy before starting the new version.
 - Set `APP_ENV=prod` (hides /docs) and optionally `SENTRY_DSN`.
 
-## Job statuses (Phase 1A)
+## Job statuses
 
 | Status | Meaning |
 |---|---|
 | QUEUED | Created, waiting for a worker |
 | COLLECTING | Downloading documents from Zoho |
-| COLLECTED | At least one usable document stored (Phase 1B continues from here) |
+| COLLECTED | At least one usable document stored; reading queued |
+| READING | OCR + classification running |
+| READ | Every stored file has pages, text, quality and document type |
 | NO_DOCUMENTS | Nothing usable on the account |
 | FAILED | Zoho unreachable after retries, auth problem, or unexpected error (see `error`) |
 

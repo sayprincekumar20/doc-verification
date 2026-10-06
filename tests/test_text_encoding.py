@@ -17,8 +17,13 @@ def test_all_text_io_names_an_encoding():
             if not isinstance(node, ast.Call):
                 continue
             func = node.func
-            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
-            if name in ("read_text", "write_text", "open") and not any(
+            if isinstance(func, ast.Attribute) and func.attr in ("read_text", "write_text"):
+                name = func.attr
+            elif isinstance(func, ast.Name) and func.id == "open":  # builtin open() only
+                name = "open"
+            else:
+                continue
+            if not any(
                 kw.arg == "encoding" for kw in node.keywords
             ):
                 if name == "open" and any(
