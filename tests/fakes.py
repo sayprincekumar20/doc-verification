@@ -40,6 +40,8 @@ class FakeZoho:
         self.field_attachments: dict[str, bytes] = {}
         self.scope_missing_paths: set[str] = set()  # paths answering 401 OAUTH_SCOPE_MISMATCH
         self.revoked: list[str] = []
+        self.updates: list[dict] = []
+        self.update_error: dict | None = None
 
     @classmethod
     def from_real_responses(cls) -> "FakeZoho":
@@ -77,6 +79,15 @@ class FakeZoho:
             return httpx.Response(self.fail_next.pop(0), json={"code": "ERR"})
 
         base = "/crm/v8"
+        if request.method == "PUT" and path == f"{base}/Accounts":
+            body = json.loads(request.content)
+            self.updates.append(body)
+            if self.update_error:
+                return httpx.Response(400, json={"data": [self.update_error]})
+            record = body["data"][0]
+            self.account.update({k: v for k, v in record.items() if k != "id"})
+            return httpx.Response(200, json={"data": [{"code": "SUCCESS", "status": "success",
+                                                       "details": {"id": record["id"]}}]})
         if path == f"{base}/users":
             return httpx.Response(200, json={"users": [{
                 "full_name": "Example Integration", "email": "integration@example.com",

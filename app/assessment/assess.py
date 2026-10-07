@@ -140,9 +140,11 @@ def _confidence(chosen: Fact, facts: list[Fact], matcher) -> float:
 
 
 def _proposal(zoho_field, current, proposed, action, confidence, sources, reason,
-              attention=False) -> dict:
+              attention=False, grounding=None, agreeing=0) -> dict:
     return {"zoho_field": zoho_field, "current_value": current, "proposed_value": proposed,
             "action": action, "confidence": confidence, "sources": sources, "reason": reason,
+            "grounding": grounding,           # how the chosen value was confirmed
+            "agreeing_documents": agreeing,   # documents (incl. the chosen one) with this value
             "needs_attention": attention or (confidence is not None
                                              and confidence < policy.MIN_CONFIDENCE_FOR_PROPOSAL)}
 
@@ -159,25 +161,28 @@ def _compare_field(zoho_field: str, current: Any, chosen: Fact | None, proposed:
         return None
     sources = [_src(f) for f in facts]
     conf = _confidence(chosen, facts, matcher)
+    agreeing = 1 + sum(1 for f in facts if f.document_id != chosen.document_id
+                       and matcher(chosen.value, f.value) in (SAME, LIKELY_SAME))
+    extra = {"grounding": chosen.grounding, "agreeing": agreeing}
     if conflict:
         return _proposal(zoho_field, current, None, "REVIEW_CONFLICT", None, sources,
                          "Documents disagree on this value; the reviewer must choose.", True)
     if current in (None, "", []):
         return _proposal(zoho_field, current, proposed, "FILL", conf, sources,
-                         "Zoho is empty; value found on documents.")
+                         "Zoho is empty; value found on documents.", **extra)
     verdict = matcher(str(current), proposed)
     if verdict == SAME:
         return _proposal(zoho_field, current, current, "MATCH", conf, sources,
-                         "Zoho matches the documents.")
+                         "Zoho matches the documents.", **extra)
     if verdict == LIKELY_SAME:
         return _proposal(zoho_field, current, current, "MATCH", conf, sources,
-                         "Zoho matches the documents (minor wording difference).")
+                         "Zoho matches the documents (minor wording difference).", **extra)
     if not allow_correct:
         return _proposal(zoho_field, current, None, "DIFFERS", conf, sources,
                          "Zoho differs from the documents; not changed automatically. "
-                         + extra_reason, True)
+                         + extra_reason, True, **extra)
     return _proposal(zoho_field, current, proposed, "CORRECT", conf, sources,
-                     ("Zoho differs from the documents. " + extra_reason).strip())
+                     ("Zoho differs from the documents. " + extra_reason).strip(), **extra)
 
 
 def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
@@ -239,7 +244,7 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     name = _best(facts[name_attr])
     if name:
         p = _compare_field("Invoice_Company_Name", snap.get("Invoice_Company_Name"), name,
-                           normalize_name(name.value), match_business, facts[name_attr],
+                           " ".join(name.value.split()), match_business, facts[name_attr],
                            name_attr in conflict)
         if p:
             proposals.append(p)

@@ -66,14 +66,16 @@ class ZohoClient:
             return min(float(resp.headers["Retry-After"]), 120.0)
         return min(2**attempt + random.uniform(0, 1), 60.0)
 
-    def _request(self, method: str, path: str, params: dict | None = None) -> httpx.Response:
+    def _request(self, method: str, path: str, params: dict | None = None,
+                 json: dict | None = None) -> httpx.Response:
         url = f"{self._base}{path}"
         refreshed = False
         last_error = ""
         for attempt in range(self._s.zoho_max_retries + 1):
             headers = {"Authorization": f"Zoho-oauthtoken {self._tokens.get_token(refreshed)}"}
             try:
-                resp = self._http.request(method, url, params=params, headers=headers)
+                resp = self._http.request(method, url, params=params, json=json,
+                                          headers=headers)
             except httpx.TransportError as exc:
                 last_error = f"network error: {exc}"
                 self._sleep(self._backoff(attempt, None))
@@ -161,6 +163,22 @@ class ZohoClient:
     def download_file(self, file_id: str, max_bytes: int) -> bytes:
         """Fallback: fetch a Zoho File System file by encrypted id (needs ZohoCRM.Files.READ)."""
         return self._download("/files", {"id": file_id}, max_bytes)
+
+    # ---------- updates ----------
+
+    def update_record(self, module: str, record_id: str, values: dict[str, Any],
+                      trigger: list[str] | None = None) -> dict[str, Any]:
+        """PUT /{module} with one record. `trigger` = [] runs no workflows/approvals/blueprints
+        (so our own update can't start another verification). Returns Zoho's per-record result;
+        raises ZohoAPIError if Zoho rejects the record."""
+        body: dict[str, Any] = {"data": [{"id": record_id, **values}]}
+        if trigger is not None:
+            body["trigger"] = trigger
+        resp = self._request("PUT", f"/{module}", json=body)
+        result = (resp.json().get("data") or [{}])[0]
+        if result.get("code") != "SUCCESS":
+            raise ZohoAPIError(resp.status_code, str(result))
+        return result
 
     # ---------- setup checks ----------
 

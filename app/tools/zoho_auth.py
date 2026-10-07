@@ -24,9 +24,11 @@ from app.zoho.auth import (
 from app.zoho.client import ZohoClient
 from app.zoho.errors import ZohoAPIError, ZohoError
 
-# Read-only scopes for Phase 1. Phase 4 adds write scopes for updating Accounts.
+# Read scopes for collection; ZohoCRM.modules.accounts.UPDATE is needed only for automatic
+# updates (AUTO_APPLY_MODE=on) and the later write-back after review.
 SCOPES = [
     "ZohoCRM.modules.accounts.READ",
+    "ZohoCRM.modules.accounts.UPDATE",
     "ZohoCRM.modules.notes.READ",
     "ZohoCRM.modules.attachments.READ",
     "ZohoCRM.settings.fields.READ",

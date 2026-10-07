@@ -8,6 +8,7 @@ from app.db.session import session_scope
 from app.extraction.providers import TransientExtractionError, build_provider
 from app.logging import setup_logging
 from app.pipeline.assess import assess_job
+from app.pipeline.auto_apply import auto_apply_job
 from app.pipeline.collect import collect_job
 from app.pipeline.extract import extract_job, extraction_version, manila_today
 from app.pipeline.read import read_job
@@ -105,6 +106,10 @@ def extract_documents(self, job_id: str) -> str:
                 return job.status if job else "missing"
             extract_job(db, job, build_storage(get_settings()), provider)
             assess_job(db, job, extraction_version(provider), manila_today())  # Phase 1D
+            s = get_settings()
+            if s.auto_apply_mode != "off":
+                auto_apply_job(db, job, get_zoho_client(), s.auto_apply_mode,
+                               s.auto_apply_threshold, s.zoho_update_triggers)
             return job.status
     except TransientExtractionError as exc:
         if self.request.retries < 5:

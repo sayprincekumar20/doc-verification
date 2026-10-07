@@ -100,5 +100,6 @@ def test_assess_account_tool(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert rc == 0 and "RECOMMENDATION: MANUAL_REVIEW" in out
     assert "FILL" in out and "Owner_Name" in out and "JUAN DELA CRUZ" in out
+    assert "Automatic update plan (threshold 0.95" in out
     saved = json.loads((folder / "assessment.json").read_text(encoding="utf-8"))
     assert saved["assessment"]["recommendation"] == "MANUAL_REVIEW"

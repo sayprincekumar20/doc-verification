@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from app.assessment.assess import DocInput, assess
+from app.assessment.auto_apply import plan
 from app.config import DEFAULT_SNAPSHOT_FIELDS
 from app.extraction.providers import ExtractionError, build_provider
 from app.tools.envfile import read_env
@@ -101,6 +102,16 @@ def main(argv: list[str] | None = None) -> int:
     a["not_extracted"] = [{"file": r["file"], "status": r["status"], "error": r.get("error")}
                           for r in results if r["status"] != "EXTRACTED"]
     print_assessment(a)
+    threshold = float(env.get("AUTO_APPLY_THRESHOLD") or 0.95)
+    auto_plan = plan(a, threshold)
+    a["auto_apply_plan"] = auto_plan
+    print(f"\nAutomatic update plan (threshold {threshold}; this tool never writes to Zoho; "
+          f"AUTO_APPLY_MODE in .env is {env.get('AUTO_APPLY_MODE', 'off')}):")
+    if not auto_plan:
+        print("  nothing to fill or correct")
+    for item in auto_plan:
+        print(f"  {item['decision']:6} {item['action']:7} {item['zoho_field']:30} -> "
+              f"{str(item['new_value'])!s:.40}  ({item['reason']})")
     out = args.folder / "assessment.json"
     out.write_text(json.dumps({"assessment": a, "documents": results}, indent=2,
                               ensure_ascii=False), encoding="utf-8")

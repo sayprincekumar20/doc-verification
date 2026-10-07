@@ -2,10 +2,11 @@ import uuid
 from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_enqueuer, require_api_key
-from app.db.models import JobAssessment, VerificationJob
+from app.db.models import FieldUpdate, JobAssessment, VerificationJob
 from app.db.session import get_db
 from app.schemas import JobCreate, JobCreated, JobOut
 from app.services.jobs import create_or_get_active_job
@@ -47,3 +48,14 @@ def get_assessment(job_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No assessment for this job yet")
     return {"job_id": str(job_id), "recommendation": row.recommendation,
             "rules_version": row.rules_version, **row.assessment}
+
+
+@router.get("/{job_id}/updates")
+def get_updates(job_id: uuid.UUID, db: Session = Depends(get_db)) -> list[dict]:
+    """Automatic Zoho updates for this job (or shadow-mode 'would update' records)."""
+    rows = db.scalars(select(FieldUpdate).where(FieldUpdate.job_id == job_id)
+                      .order_by(FieldUpdate.created_at)).all()
+    return [{"field": r.zoho_field, "action": r.action, "old_value": r.old_value,
+             "new_value": r.new_value, "confidence": r.confidence, "grounding": r.grounding,
+             "mode": r.mode, "status": r.status, "detail": r.detail,
+             "created_at": r.created_at.isoformat()} for r in rows]

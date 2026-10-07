@@ -5,7 +5,8 @@ Zoho CRM. This release covers **Phase 0 (foundation)**, **Phase 1A (document col
 **Phase 1B (reading: format conversion, photo cleanup, OCR, classification)**, **Phase 1C
 (key-value extraction with a vision model, grounded against OCR)**, **Phase 1D (customer
 assessment: cross-document checks, Zoho change proposals, recommendation)** and the Phase 1E
-evaluation tools. See `docs/reading.md`, `docs/extraction.md` and `docs/assessment.md`.
+evaluation tools. See `docs/reading.md`, `docs/extraction.md`, `docs/assessment.md` and
+`docs/auto-apply.md` (automatic Zoho updates for high-confidence values, off by default).
 
 ## What works now
 

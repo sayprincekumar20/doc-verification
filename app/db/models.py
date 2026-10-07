@@ -234,3 +234,26 @@ class JobAssessment(Base):
     recommendation: Mapped[str] = mapped_column(String(20))   # ACTIVE | INACTIVE | MANUAL_REVIEW
     assessment: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FieldUpdate(Base):
+    """Audit trail of automatic Zoho updates (and shadow-mode 'would update' records).
+    old_value makes every change traceable and reversible."""
+
+    __tablename__ = "field_updates"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("verification_jobs.id", ondelete="CASCADE"), index=True)
+    account_id: Mapped[str] = mapped_column(String(32), index=True)
+    zoho_field: Mapped[str] = mapped_column(String(80))
+    action: Mapped[str] = mapped_column(String(16))          # FILL | CORRECT
+    old_value: Mapped[str | None] = mapped_column(Text)
+    new_value: Mapped[str | None] = mapped_column(Text)
+    confidence: Mapped[float | None] = mapped_column()
+    grounding: Mapped[str | None] = mapped_column(String(16))
+    sources: Mapped[list | None] = mapped_column(JSON)
+    mode: Mapped[str] = mapped_column(String(8))             # shadow | on
+    status: Mapped[str] = mapped_column(String(20))   # SHADOW | APPLIED | SKIPPED_CHANGED | FAILED
+    detail: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

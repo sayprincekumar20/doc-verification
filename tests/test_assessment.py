@@ -137,7 +137,7 @@ def test_corporation_needs_sec_and_has_no_picklist_value():
     assert p["Type_of_Business_Organization"]["action"] == "NO_PICKLIST_VALUE"
     assert "Owner_Name" not in p  # a corporation's name is not a person
     assert p["Account_Name"]["action"] == "DIFFERS"  # brand vs registered name, flagged only
-    assert p["Invoice_Company_Name"]["proposed_value"] == "EXAMPLE FOODS INC"
+    assert p["Invoice_Company_Name"]["proposed_value"] == "EXAMPLE FOODS INC."  # as printed
 
 
 def test_tin_conflict_between_bir_and_id_is_critical():

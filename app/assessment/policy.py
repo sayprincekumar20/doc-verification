@@ -45,3 +45,22 @@ def business_form(taxpayer_type: str | None, zoho_type: str | None) -> str:
     if "PARTNERSHIP" in text or "PARNERSHIP" in text:  # the Zoho picklist has this typo
         return "PARTNERSHIP"
     return "UNKNOWN"
+
+
+# ---------------- Automatic updates (AUTO_APPLY_MODE = off | shadow | on) ----------------
+# A proposal is written to Zoho without review only if ALL of these hold:
+#   - the field and action are listed here, with at least N documents agreeing on the value
+#   - confidence >= AUTO_APPLY_THRESHOLD (setting, default 0.95)
+#   - the value was confirmed: grounding in AUTO_APPLY_GROUNDINGS
+#   - it is not on HOLD / needing attention, and the assessment has no critical problem
+#     other than an expired document
+# Evidence (2026-10-07 benchmark, 101 fields): every wrong value had confidence <= 0.5.
+AUTO_APPLY_RULES: dict[str, dict[str, int]] = {
+    "Tax_Identification_Number_TIN": {"FILL": 1, "CORRECT": 2},
+    "Type_of_Business_Organization": {"FILL": 1},
+    "Business_Style": {"FILL": 1},
+    "Owner_Name": {"FILL": 1, "CORRECT": 2},
+    "Invoice_Company_Name": {"FILL": 1, "CORRECT": 2},
+}
+AUTO_APPLY_GROUNDINGS = {"EXACT", "CROSS_CHECKED"}
+# Never automatic: Account_Name, addresses, attachments, Customer_Status.

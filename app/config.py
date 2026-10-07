@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     extraction_reasoning_effort: str = "low"   # OpenAI only: none | low | medium | high
 
+    # Automatic Zoho updates for high-confidence proposals (app/assessment/policy.py rules).
+    auto_apply_mode: str = "off"               # off | shadow (record only) | on (write)
+    auto_apply_threshold: float = 0.95
+    zoho_update_triggers: list[str] = []       # [] = our updates start no Zoho workflows
+
     sentry_dsn: str | None = None
 
 
