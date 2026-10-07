@@ -3,7 +3,7 @@ whenever wording or fields change, so cached results are recomputed."""
 
 from app.extraction.fields import FieldSpec
 
-EXTRACTION_PROMPT_VERSION = "ph-docs-2"
+EXTRACTION_PROMPT_VERSION = "ph-docs-3"
 
 DOCUMENT_TYPES = ["BIR_2303", "DTI_BN_CERT", "MAYORS_PERMIT", "SEC_CERT", "GIS",
                   "BARANGAY_CLEARANCE", "GOVERNMENT_ID", "FOOD_SAFETY_PERMIT", "OTHER"]
@@ -19,6 +19,11 @@ Rules:
 - Long digit strings (TIN, OCN, receipt numbers): copy every digit; count repeated zeros carefully.
 - For checkbox fields, return the option whose box is marked (X or check), not just any printed
   option.
+- Owner/taxpayer/holder fields are the business owner or ID holder. Never use the names of mayors,
+  revenue officers or other signing officials.
+- Ignore date/time stamps added by the camera (e.g. "2026.10.03 09:20" in a photo corner) and
+  phone model watermarks; they are not part of the document.
+- If the same page appears more than once, read the clearest copy.
 - "evidence" is the short printed text where you read the value (label + value), max 120 chars.
 - "page" is the 1-based page number where the value appears.
 - Report what the document actually is in document_type, even if it differs from the expected type.

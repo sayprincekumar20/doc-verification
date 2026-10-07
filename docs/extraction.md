@@ -64,6 +64,16 @@ checkbox fields marked UNVERIFIABLE + BIR branch-code cross-check (BRANCH_MISMAT
 changed numbers inside addresses/names are CONFLICT, a missing postal code is not; "No." labels
 stripped from codes; prompt rules for labels, long digit strings and checkboxes (`ph-docs-2`).
 
+## Document types
+
+BIR 2303, DTI Business Name certificate, Mayor's/Business Permit and government IDs (BIR TIN ID,
+PhilSys, driver's license, UMID, passport, PRC, postal, voter's ID) have their own field lists;
+other documents get a generic list. TIN IDs have no expiry (`NO_EXPIRY`); other IDs are checked
+against their expiry date. BIR OCNs must match `NNN RC + 14 digits` and start with the RDO code.
+
+Prompt `ph-docs-3` rules learned from real photos: never take the mayor/signing official as the
+owner; ignore camera date stamps and phone watermarks; read the clearest copy of repeated pages.
+
 ## Choose a provider: benchmark on the gold set
 
 ```bash

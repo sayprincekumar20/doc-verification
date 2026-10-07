@@ -132,3 +132,16 @@ def test_quality_handles_tiny_images():
     from app.reading.quality import assess
     q = assess(np.zeros((300, 200, 3), np.uint8), np.zeros((300, 200), np.uint8), 30.0, 3)
     assert q.label == "UNREADABLE" and any("low resolution" in r for r in q.reasons)
+
+
+def test_tin_id_card_is_a_government_id():
+    text = ("REPUBLIC OF THE PHILIPPINES DEPARTMENT OF FINANCE BUREAU OF INTERNAL REVENUE "
+            "DELA CRUZ, JUAN TIN: 123-456-789-000 BIRTH DATE: 03/03/1984 "
+            "ISSUE DATE: 08/19/2020 SIGNATURE")
+    assert classify_text(text).document_type == "GOVERNMENT_ID"
+
+
+def test_bir_2303_still_wins_over_id_signals():
+    text = ("BIR FORM 2303 CERTIFICATE OF REGISTRATION TIN & BRANCH CODE NAME OF TAXPAYER "
+            "SIGNATURE ISSUE DATE")
+    assert classify_text(text).document_type == "BIR_2303"

@@ -13,7 +13,8 @@ _LEGAL_SUFFIXES = r"\b(INC|INCORPORATED|CORP|CORPORATION|CO|COMPANY|OPC|LTD|LIMI
 
 
 def alnum(value: str) -> str:
-    return re.sub(r"[^A-Z0-9]", "", str(value).upper())
+    # Ñ -> N: OCR and people often write DASMARINAS for DASMARIÑAS
+    return re.sub(r"[^A-Z0-9]", "", str(value).upper().replace("Ñ", "N"))
 
 
 def parse_date(value: str) -> date | None:

@@ -1,5 +1,6 @@
 """Extract one document: vision model -> normalize -> ground -> validate -> per-field confidence."""
 
+import re
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -16,7 +17,7 @@ from app.extraction.grounding import (
     UNVERIFIABLE,
     ground,
 )
-from app.extraction.normalize import normalize
+from app.extraction.normalize import alnum, normalize
 from app.extraction.prompts import output_schema, user_prompt
 from app.extraction.providers import ExtractionError, ModelOutput, VisionProvider
 from app.extraction.validate import Issue, check_fields, check_validity
@@ -111,6 +112,10 @@ def _field_result(spec: FieldSpec, item: dict | None, pages: list[PageInput]) ->
     issues = []
     if spec.kind in ("date", "tin", "money") and normalized is None:
         confidence = 0.2
+    if spec.pattern and not re.fullmatch(spec.pattern, alnum(value)):
+        confidence = 0.2
+        issues.append(Issue("INVALID_FORMAT", f"'{value}' does not have the expected format",
+                            spec.name, "WARNING").as_dict())
     if g.status == CONFLICT:
         issues.append(Issue("OCR_CONFLICT", f"OCR read '{g.matched}' near this value; check "
                             "the image", spec.name, "WARNING").as_dict())
@@ -170,8 +175,16 @@ def extract_document(pages: list[PageInput], expected_type: str, provider: Visio
 
     raw_fields = out.data.get("fields") or {}
     results = {s.name: _field_result(s, raw_fields.get(s.name), pages) for s in specs}
-    if doc_type == "BIR_2303" and (branch_issue := check_branch_code(results)):
-        issues.append(branch_issue)
+    if doc_type == "BIR_2303":
+        if branch_issue := check_branch_code(results):
+            issues.append(branch_issue)
+        ocn, rdo = results.get("ocn"), results.get("rdo_code")
+        if ocn and rdo and ocn.value and rdo.value and re.fullmatch(r"\d{3}RC\d{14}",
+                                                                   alnum(ocn.value)):
+            rdo_digits = re.sub(r"\D", "", rdo.value).zfill(3)
+            if alnum(ocn.value)[:3] != rdo_digits:
+                issues.append(Issue("OCN_RDO_MISMATCH", f"OCN starts with "
+                                    f"{alnum(ocn.value)[:3]} but the RDO is {rdo_digits}", "ocn"))
     raw = {k: r.value for k, r in results.items()}
     normalized = {k: r.normalized for k, r in results.items()}
     issues += check_fields(specs, raw, normalized)

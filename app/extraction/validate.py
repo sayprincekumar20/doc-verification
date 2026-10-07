@@ -21,7 +21,7 @@ class Issue:
 
 @dataclass
 class Validity:
-    status: str                 # VALID | EXPIRED | NOT_YET_VALID | UNKNOWN
+    status: str                 # VALID | EXPIRED | NOT_YET_VALID | NO_EXPIRY | UNKNOWN
     valid_until: str | None = None
     issues: list[Issue] = field(default_factory=list)
 
@@ -63,6 +63,12 @@ def check_validity(document_type: str, normalized: dict, today: date) -> Validit
         if end is None and year and str(year).isdigit():
             end = date(int(year), 12, 31)  # permits run to Dec 31 of their year
         return _status(_d(normalized, "date_issued"), end, today, [])
+
+    if document_type == "GOVERNMENT_ID":
+        end = _d(normalized, "expiry_date")
+        if end is None and "TIN" in (normalized.get("id_type") or ""):
+            return Validity("NO_EXPIRY")  # BIR TIN IDs do not expire
+        return _status(_d(normalized, "issue_date"), end, today, [])
 
     if document_type == "BIR_2303":
         # The COR does not expire; registration must simply exist.

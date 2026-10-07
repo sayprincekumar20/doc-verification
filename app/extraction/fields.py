@@ -15,6 +15,7 @@ class FieldSpec:
     required: bool = False
     zoho_field: str | None = None
     options: tuple[str, ...] = ()   # for kind="choice" (printed checkboxes)
+    pattern: str | None = None      # regex on the value's letters+digits (format check)
 
 
 SPECS: dict[str, list[FieldSpec]] = {
@@ -36,7 +37,8 @@ SPECS: dict[str, list[FieldSpec]] = {
                   "date"),
         FieldSpec("line_of_business", "Line of Business", "text", False, "Business_Style"),
         FieldSpec("psic", "PSIC code and description, e.g. 56101-RESTAURANTS", "text"),
-        FieldSpec("ocn", "OCN number at the top right", "code"),
+        FieldSpec("ocn", "OCN number at the top right, e.g. 041RC20260000005583", "code",
+                  pattern=r"\d{3}RC\d{14}"),
     ],
     "DTI_BN_CERT": [
         FieldSpec("business_name", "The registered business name", "name", True,
@@ -53,9 +55,10 @@ SPECS: dict[str, list[FieldSpec]] = {
     ],
     "MAYORS_PERMIT": [
         FieldSpec("business_name", "Business Name", "name", True, "Invoice_Company_Name"),
-        FieldSpec("owner_name", "Proprietor/Owner or Taxpayer's Name", "name", True,
-                  "Owner_Name"),
+        FieldSpec("owner_name", "Proprietor/Owner or Taxpayer's Name of the business. Never the "
+                  "mayor or another signing official", "name", True, "Owner_Name"),
         FieldSpec("business_address", "Business Address", "address", False, "Billing_Street"),
+        FieldSpec("permit_status", "NEW or RENEW, if printed", "text"),
         FieldSpec("permit_number", "Business/Mayor's Permit No.", "code", True,
                   None),
         FieldSpec("permit_year", "Year the permit covers, e.g. 2025 ('Series of 2025')",
@@ -69,7 +72,20 @@ SPECS: dict[str, list[FieldSpec]] = {
         FieldSpec("date_issued", "Date issued", "date"),
         FieldSpec("valid_until", "Expiry date; Mayor's permits usually end December 31 of the "
                   "permit year", "date"),
-        FieldSpec("business_id", "Business ID / Account No. if printed", "code"),
+        FieldSpec("business_id", "Business ID / Business Identification Number (BIN) / Account "
+                  "No., if printed", "code"),
+    ],
+    "GOVERNMENT_ID": [
+        FieldSpec("id_type", "Kind of ID, e.g. BIR TIN ID, PhilSys National ID, Driver's "
+                  "License, UMID, Passport, Postal ID, PRC ID", "text", True),
+        FieldSpec("full_name", "Holder's full name exactly as printed", "name", True),
+        FieldSpec("id_number", "The ID's main number (for a TIN ID, the TIN)", "code", True),
+        FieldSpec("tin", "TIN if printed on the ID", "tin"),
+        FieldSpec("address", "Holder's address if printed", "address"),
+        FieldSpec("birth_date", "Birth date", "date"),
+        FieldSpec("issue_date", "Issue date", "date"),
+        FieldSpec("expiry_date", "Expiry / valid until date; null if the ID has none (TIN IDs "
+                  "do not expire)", "date"),
     ],
 }
 

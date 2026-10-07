@@ -188,3 +188,43 @@ def test_numbers_conflict_rule():
     assert numbers_conflict("LOT 20 BLOCK 21", "LOT 20 BLOCK 23")
     assert not numbers_conflict("PUROK 1 PUYPUY BAY", "PUROK 1 PUYPUY 4033 BAY")  # zip omitted
     assert not numbers_conflict("REAL ST", "REAL ST")
+
+
+# ---- new document types: TIN ID card, Dasmariñas permit, multi-page 2303 ----
+
+def test_tin_id_card_no_expiry():
+    text = "BUREAU OF INTERNAL REVENUE JUAN DELA CRUZ TIN: 123-456-789-000 BIRTH DATE: 03/03/1984"
+    fake = FakeVision({"id_type": "BIR TIN ID", "full_name": "DELA CRUZ, JUAN",
+                       "id_number": "123-456-789-000", "tin": "123-456-789-000",
+                       "birth_date": "03/03/1984"}, "GOVERNMENT_ID")
+    r = extract_document(_pages(text), "GOVERNMENT_ID", fake, today=date(2026, 10, 7))
+    assert r.validity_status == "NO_EXPIRY"
+    assert r.fields["tin"].normalized == "123-456-789-00000"
+    assert r.fields["tin"].grounding == EXACT
+
+
+def test_expired_drivers_license():
+    fake = FakeVision({"id_type": "Driver's License", "full_name": "JUAN DELA CRUZ",
+                       "id_number": "N01-23-456789", "expiry_date": "2025-03-03"},
+                      "GOVERNMENT_ID")
+    r = extract_document(_pages("N01-23-456789 JUAN DELA CRUZ 2025-03-03"), "GOVERNMENT_ID",
+                         fake, today=date(2026, 10, 7))
+    assert r.validity_status == "EXPIRED"
+
+
+def test_invalid_ocn_format_and_rdo_mismatch():
+    text = "TIN 009-992-560-00004 OCN: 041RC20260000005583 REVENUE DISTRICT OFFICE NO. 041"
+    short = FakeVision({"tin": "009-992-560-00004", "ocn": "041RC2026000005583",
+                        "rdo_code": "041"}, "BIR_2303")  # one zero dropped
+    r = extract_document(_pages(text), "BIR_2303", short, today=date(2026, 10, 7))
+    assert r.fields["ocn"].confidence == 0.2
+    assert any(i["code"] == "INVALID_FORMAT" for i in r.fields["ocn"].issues)
+
+    other_rdo = FakeVision({"tin": "009-992-560-00004", "ocn": "041RC20260000005583",
+                            "rdo_code": "056"}, "BIR_2303")
+    r = extract_document(_pages(text), "BIR_2303", other_rdo, today=date(2026, 10, 7))
+    assert any(i["code"] == "OCN_RDO_MISMATCH" for i in r.issues)
+
+
+def test_enye_matches_plain_n_in_ocr():
+    assert ground("CITY OF DASMARIÑAS", "text", "CITY OF DASMARINAS CAVITE").status == EXACT
