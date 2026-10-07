@@ -19,6 +19,7 @@ RUN pip install ".[monitoring]"
 
 COPY alembic.ini ./
 COPY migrations ./migrations
+COPY scripts ./scripts
 
 RUN mkdir -p /data/files && chown -R app:app /data /app
 USER app

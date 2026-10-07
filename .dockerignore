@@ -1,0 +1,12 @@
+# Keep secrets, customer documents and local environments out of the image build.
+.env
+samples/
+.venv/
+venv/
+.git/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+data/
