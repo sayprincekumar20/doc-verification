@@ -24,11 +24,13 @@ from app.zoho.auth import (
 from app.zoho.client import ZohoClient
 from app.zoho.errors import ZohoAPIError, ZohoError
 
-# Read scopes for collection; ZohoCRM.modules.accounts.UPDATE is needed only for automatic
-# updates (AUTO_APPLY_MODE=on) and the later write-back after review.
+# Read scopes for collection. UPDATE / notes.CREATE / tasks.CREATE are needed only for
+# automatic actions (AUTO_APPLY_MODE=on): field updates, activation, alert notes and tasks.
 SCOPES = [
     "ZohoCRM.modules.accounts.READ",
     "ZohoCRM.modules.accounts.UPDATE",
+    "ZohoCRM.modules.notes.CREATE",
+    "ZohoCRM.modules.tasks.CREATE",
     "ZohoCRM.modules.notes.READ",
     "ZohoCRM.modules.attachments.READ",
     "ZohoCRM.settings.fields.READ",

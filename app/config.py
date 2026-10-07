@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     auto_apply_mode: str = "off"               # off | shadow (record only) | on (write)
     auto_apply_threshold: float = 0.95
     zoho_update_triggers: list[str] = []       # [] = our updates start no Zoho workflows
+    # Alerts (same mode): a Note on the Account + a Task for the Account owner.
+    alert_tasks: bool = True
+    alert_task_due_days: int = 3
+    alert_repeat_after_days: int = 7           # same issues -> no new task within this window
 
     sentry_dsn: str | None = None
 

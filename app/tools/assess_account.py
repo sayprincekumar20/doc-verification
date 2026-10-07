@@ -15,6 +15,7 @@ from datetime import date
 from pathlib import Path
 
 from app.assessment.assess import DocInput, assess
+from app.assessment.alerts import build_alerts, status_decision
 from app.assessment.auto_apply import plan
 from app.config import DEFAULT_SNAPSHOT_FIELDS
 from app.extraction.providers import ExtractionError, build_provider
@@ -112,6 +113,18 @@ def main(argv: list[str] | None = None) -> int:
     for item in auto_plan:
         print(f"  {item['decision']:6} {item['action']:7} {item['zoho_field']:30} -> "
               f"{str(item['new_value'])!s:.40}  ({item['reason']})")
+    status = status_decision(a, snapshot.get("Customer_Status"), threshold)
+    print(f"\nCustomer_Status: now {snapshot.get('Customer_Status')!r} -> {status[0]}"
+          f"  ({status[1]})")
+    alerts = build_alerts(a, today)
+    a["alerts"] = alerts
+    a["status_decision"] = {"decision": status[0], "reason": status[1]}
+    print("\nAlerts (Note on the Account + Task for the owner when AUTO_APPLY_MODE=on):")
+    if not alerts:
+        print("  none")
+    for al in alerts:
+        action = f"  -> {al['action']}" if al.get("action") else ""
+        print(f"  [{al['severity']}] {al['message']}{action}")
     out = args.folder / "assessment.json"
     out.write_text(json.dumps({"assessment": a, "documents": results}, indent=2,
                               ensure_ascii=False), encoding="utf-8")

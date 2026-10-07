@@ -257,3 +257,24 @@ class FieldUpdate(Base):
     status: Mapped[str] = mapped_column(String(20))   # SHADOW | APPLIED | SKIPPED_CHANGED | FAILED
     detail: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AccountAlert(Base):
+    """Alerts raised for an account (Note + Task in Zoho), kept to avoid duplicate tasks."""
+
+    __tablename__ = "account_alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("verification_jobs.id", ondelete="CASCADE"), index=True)
+    account_id: Mapped[str] = mapped_column(String(32), index=True)
+    mode: Mapped[str] = mapped_column(String(8))                 # shadow | on
+    signature: Mapped[str] = mapped_column(Text)                 # actionable issue set
+    alerts: Mapped[list] = mapped_column(JSON)
+    status_decision: Mapped[str] = mapped_column(String(20))     # ACTIVATE | NO_CHANGE | ...
+    note_status: Mapped[str] = mapped_column(String(20))   # CREATED | SHADOW | SKIPPED | FAILED
+    task_status: Mapped[str] = mapped_column(String(20))
+    zoho_note_id: Mapped[str | None] = mapped_column(String(32))
+    zoho_task_id: Mapped[str | None] = mapped_column(String(32))
+    detail: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

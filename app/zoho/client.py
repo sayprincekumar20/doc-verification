@@ -180,6 +180,29 @@ class ZohoClient:
             raise ZohoAPIError(resp.status_code, str(result))
         return result
 
+    def _create(self, path: str, record: dict[str, Any]) -> str:
+        resp = self._request("POST", path, json={"data": [record]})
+        result = (resp.json().get("data") or [{}])[0]
+        if result.get("code") != "SUCCESS":
+            raise ZohoAPIError(resp.status_code, str(result))
+        return str((result.get("details") or {}).get("id", ""))
+
+    def create_note(self, module: str, record_id: str, title: str, content: str) -> str:
+        """Note on a record (shown in its Notes section). Scope ZohoCRM.modules.notes.CREATE."""
+        return self._create(f"/{module}/{record_id}/Notes",
+                            {"Note_Title": title[:120], "Note_Content": content})
+
+    def create_task(self, subject: str, description: str, due_date: str, account_id: str,
+                    owner_id: str | None = None) -> str:
+        """Task linked to an Account, assigned to its owner. Scope ZohoCRM.modules.tasks.CREATE."""
+        task: dict[str, Any] = {"Subject": subject[:250], "Description": description,
+                                "Due_Date": due_date, "Status": "Not Started",
+                                "Priority": "High", "$se_module": "Accounts",
+                                "What_Id": {"id": account_id}}
+        if owner_id:
+            task["Owner"] = {"id": owner_id}
+        return self._create("/Tasks", task)
+
     # ---------- setup checks ----------
 
     def get_current_user(self) -> dict[str, Any]:

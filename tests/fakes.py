@@ -42,6 +42,8 @@ class FakeZoho:
         self.revoked: list[str] = []
         self.updates: list[dict] = []
         self.update_error: dict | None = None
+        self.notes_created: list[dict] = []
+        self.tasks_created: list[dict] = []
 
     @classmethod
     def from_real_responses(cls) -> "FakeZoho":
@@ -88,6 +90,14 @@ class FakeZoho:
             self.account.update({k: v for k, v in record.items() if k != "id"})
             return httpx.Response(200, json={"data": [{"code": "SUCCESS", "status": "success",
                                                        "details": {"id": record["id"]}}]})
+        if request.method == "POST" and path == f"{base}/Accounts/{ACCOUNT_ID}/Notes":
+            self.notes_created.append(json.loads(request.content)["data"][0])
+            return httpx.Response(201, json={"data": [{"code": "SUCCESS", "details": {
+                "id": f"note{len(self.notes_created)}"}}]})
+        if request.method == "POST" and path == f"{base}/Tasks":
+            self.tasks_created.append(json.loads(request.content)["data"][0])
+            return httpx.Response(201, json={"data": [{"code": "SUCCESS", "details": {
+                "id": f"task{len(self.tasks_created)}"}}]})
         if path == f"{base}/users":
             return httpx.Response(200, json={"users": [{
                 "full_name": "Example Integration", "email": "integration@example.com",

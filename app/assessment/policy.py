@@ -63,4 +63,5 @@ AUTO_APPLY_RULES: dict[str, dict[str, int]] = {
     "Invoice_Company_Name": {"FILL": 1, "CORRECT": 2},
 }
 AUTO_APPLY_GROUNDINGS = {"EXACT", "CROSS_CHECKED"}
-# Never automatic: Account_Name, addresses, attachments, Customer_Status.
+# Never automatic: Account_Name, addresses, attachments. Customer_Status may only be set to
+# Active (app/assessment/alerts.py: status_decision); it is never set Inactive.

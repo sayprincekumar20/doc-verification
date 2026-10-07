@@ -109,7 +109,10 @@ def extract_documents(self, job_id: str) -> str:
             s = get_settings()
             if s.auto_apply_mode != "off":
                 auto_apply_job(db, job, get_zoho_client(), s.auto_apply_mode,
-                               s.auto_apply_threshold, s.zoho_update_triggers)
+                               s.auto_apply_threshold, s.zoho_update_triggers,
+                               alert_tasks=s.alert_tasks,
+                               task_due_days=s.alert_task_due_days,
+                               repeat_after_days=s.alert_repeat_after_days)
             return job.status
     except TransientExtractionError as exc:
         if self.request.retries < 5:
