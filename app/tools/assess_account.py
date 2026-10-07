@@ -14,8 +14,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from app.assessment.assess import DocInput, assess
 from app.assessment.alerts import build_alerts, status_decision
+from app.assessment.assess import DocInput, assess
 from app.assessment.auto_apply import plan
 from app.config import DEFAULT_SNAPSHOT_FIELDS
 from app.extraction.providers import ExtractionError, build_provider
