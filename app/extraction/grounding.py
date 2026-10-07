@@ -5,14 +5,18 @@ FUZZY     names/addresses/text only: a close match appears (OCR misread a charac
 CONFLICT  TINs, numbers, codes, dates, money: OCR read something close but DIFFERENT
           (e.g. 2901359 vs 2901350). One digit decides, so a person must check the image.
 NOT_FOUND nothing similar: the reviewer must look at the image for this field
+UNVERIFIABLE checkbox fields: every option is printed, so OCR text can't tell which is marked
+
+A close match whose numbers differ ("BLOCK 21" vs "BLOCK 23") is CONFLICT even in addresses.
 """
 
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from app.extraction.normalize import alnum, date_renderings, parse_date
+from app.extraction.normalize import alnum, date_renderings, numbers_conflict, parse_date
 
 EXACT, FUZZY, CONFLICT, NOT_FOUND = "EXACT", "FUZZY", "CONFLICT", "NOT_FOUND"
+UNVERIFIABLE, CROSS_CHECKED = "UNVERIFIABLE", "CROSS_CHECKED"
 EXACT_KINDS = {"tin", "code", "number", "money", "date"}
 FUZZY_MIN_RATIO = 0.85
 
@@ -48,6 +52,8 @@ def _best_window(needle: str, haystack: str) -> tuple[float, str]:
 def ground(value: str | None, kind: str, ocr_text: str) -> Grounding:
     if value is None or str(value).strip() == "":
         return Grounding(NOT_FOUND, 0.0)
+    if kind == "choice":
+        return Grounding(UNVERIFIABLE, 0.0)
     text = alnum(ocr_text)
     candidates = [str(value)]
     if kind == "date" and (d := parse_date(value)):
@@ -60,6 +66,7 @@ def ground(value: str | None, kind: str, ocr_text: str) -> Grounding:
         return Grounding(NOT_FOUND, 0.0)
     ratio, window = _best_window(needle, text)
     if ratio >= FUZZY_MIN_RATIO:
-        status = CONFLICT if kind in EXACT_KINDS else FUZZY
+        numbers_differ = numbers_conflict(needle, window)
+        status = CONFLICT if kind in EXACT_KINDS or numbers_differ else FUZZY
         return Grounding(status, round(ratio, 3), window)
     return Grounding(NOT_FOUND, 0.0)

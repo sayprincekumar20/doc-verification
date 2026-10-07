@@ -10,8 +10,8 @@ A gold value may be a list of acceptable answers, e.g. ["CITY OF TACLOBAN",
 "City Government of Tacloban"], when the document prints the same thing two ways.
 
 Per field:   CORRECT | MINOR_DIFF | WRONG | MISSED (value on the document, model returned null)
-Most important number: WRONG values whose grounding was EXACT/FUZZY ("wrong but looked
-confirmed"); these are the errors a reviewer could miss.
+Most important number: WRONG values whose grounding was EXACT/FUZZY/CROSS_CHECKED ("wrong but
+looked confirmed"); these are the errors a reviewer could miss.
 """
 
 import argparse
@@ -83,7 +83,7 @@ def evaluate(gold: dict, roots: list[Path], provider: VisionProvider, today: dat
                      "validity": result.validity_status, "fields": rows,
                      "seconds": round(time.monotonic() - started, 1)})
     total = sum(outcome.values())
-    silent = grounding_of_wrong["EXACT"] + grounding_of_wrong["FUZZY"]
+    silent = sum(grounding_of_wrong[g] for g in ("EXACT", "FUZZY", "CROSS_CHECKED"))
     return {
         "provider": provider.name, "model": provider.model,
         "field_accuracy": round(outcome["CORRECT"] / max(total, 1), 3),

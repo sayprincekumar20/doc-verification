@@ -86,6 +86,32 @@ def normalize_money(value: str) -> str | None:
         return None
 
 
+# "No. 0420", "No: 0420", "No 0420", "Number 12", "#123" - but not "NORTH-1".
+_CODE_LABEL = re.compile(r"^\s*(?:(?:NO|NUMBER|NUM)(?:\s*[.:#]\s*|\s+)|#\s*)", re.IGNORECASE)
+
+
+def strip_code_label(value: str) -> str:
+    """'No. 0420' -> '0420', '#123' -> '123' (labels the model sometimes copies)."""
+    stripped = _CODE_LABEL.sub("", str(value)).strip()
+    return stripped if any(c.isdigit() for c in stripped) else str(value).strip()
+
+
+def digits_in(value: str) -> list[str]:
+    return re.findall(r"\d+", alnum(value))
+
+
+def _is_subsequence(short: list[str], long: list[str]) -> bool:
+    it = iter(long)
+    return all(any(x == y for y in it) for x in short)
+
+
+def numbers_conflict(a: str, b: str) -> bool:
+    """True when the numbers in two texts disagree ('BLOCK 21' vs 'BLOCK 23'). A number that
+    is simply missing on one side (a postal code left out) is not a conflict."""
+    da, db = digits_in(a), digits_in(b)
+    return not (_is_subsequence(da, db) or _is_subsequence(db, da))
+
+
 def normalize(kind: str, value: str | None) -> str | None:
     if value is None or str(value).strip() == "":
         return None
@@ -97,5 +123,7 @@ def normalize(kind: str, value: str | None) -> str | None:
     if kind == "money":
         return normalize_money(value)
     if kind in ("code", "number"):
-        return re.sub(r"\s+", " ", str(value).upper()).strip()
+        return re.sub(r"\s+", " ", strip_code_label(value).upper()).strip()
+    if kind == "choice":
+        return normalize_name(value)
     return normalize_name(value) if kind in ("name", "address", "text") else str(value).strip()

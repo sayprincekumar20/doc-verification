@@ -3,7 +3,7 @@ whenever wording or fields change, so cached results are recomputed."""
 
 from app.extraction.fields import FieldSpec
 
-EXTRACTION_PROMPT_VERSION = "ph-docs-1"
+EXTRACTION_PROMPT_VERSION = "ph-docs-2"
 
 DOCUMENT_TYPES = ["BIR_2303", "DTI_BN_CERT", "MAYORS_PERMIT", "SEC_CERT", "GIS",
                   "BARANGAY_CLEARANCE", "GOVERNMENT_ID", "FOOD_SAFETY_PERMIT", "OTHER"]
@@ -15,6 +15,10 @@ Rules:
 - Copy each value exactly as printed (same spelling, punctuation, word order). Do not correct,
   translate, reformat or complete values.
 - If a field is not visible or not legible, return null. Never guess or infer a value.
+- For numbers and codes return only the value, without labels such as "No." or "#".
+- Long digit strings (TIN, OCN, receipt numbers): copy every digit; count repeated zeros carefully.
+- For checkbox fields, return the option whose box is marked (X or check), not just any printed
+  option.
 - "evidence" is the short printed text where you read the value (label + value), max 120 chars.
 - "page" is the 1-based page number where the value appears.
 - Report what the document actually is in document_type, even if it differs from the expected type.

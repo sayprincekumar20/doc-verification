@@ -132,3 +132,59 @@ def test_large_images_are_downscaled_for_the_model():
     big = cv2.imencode(".jpg", np.full((4000, 3000, 3), 200, np.uint8))[1].tobytes()
     out = cv2.imdecode(np.frombuffer(prepare_image(big), np.uint8), cv2.IMREAD_COLOR)
     assert max(out.shape[:2]) == MAX_IMAGE_SIDE
+
+
+# ---- fixes found by the first real benchmark (gpt-6.1-sol vs gpt-6-luna) ----
+
+BIR_TEXT = """CERTIFICATE OF REGISTRATION TIN & BRANCH CODE 003-500-318-00161 NAME OF TAXPAYER
+EXAMPLE CORP. REGISTERING OFFICE Head Office X Branch REGISTERED ADDRESS LOT 20, BLOCK 23
+VITO CRUZ EXT., SAN ANTONIO 1203 CITY OF MAKATI"""
+
+
+def _bir(values):
+    base = {"tin": "003-500-318-00161", "taxpayer_name": "EXAMPLE CORP.",
+            "registered_address": "LOT 20, BLOCK 23 VITO CRUZ EXT., SAN ANTONIO 1203 CITY "
+                                  "OF MAKATI",
+            "taxpayer_type": None}
+    return extract_document(_pages(BIR_TEXT), "BIR_2303",
+                            FakeVision({**base, **values}, "BIR_2303"), today=date(2026, 1, 1))
+
+
+def test_checkbox_contradicting_branch_code_is_critical():
+    r = _bir({"registering_office": "Head Office"})  # luna's real mistake
+    f = r.fields["registering_office"]
+    assert f.grounding == CONFLICT and f.confidence == 0.2
+    assert any(i["code"] == "BRANCH_MISMATCH" and i["severity"] == "CRITICAL" for i in r.issues)
+
+
+def test_checkbox_matching_branch_code_is_cross_checked():
+    f = _bir({"registering_office": "Branch"}).fields["registering_office"]
+    assert f.grounding == "CROSS_CHECKED" and f.confidence == 0.9 and not f.issues
+
+
+def test_head_office_tin_confirms_head_office():
+    r = extract_document(_pages("TIN 601-088-612-00000 Head Office Branch"), "BIR_2303",
+                         FakeVision({"tin": "601-088-612-00000",
+                                     "registering_office": "Head Office"}, "BIR_2303"),
+                         today=date(2026, 1, 1))
+    assert r.fields["registering_office"].grounding == "CROSS_CHECKED"
+
+
+def test_wrong_number_inside_address_is_conflict_not_fuzzy():
+    f = _bir({"registered_address": "LOT20, BLOCK21 VITO CRUZ EXT., SAN ANTONIO 1203 CITY OF "
+                                    "MAKATI"}).fields["registered_address"]  # sol's real mistake
+    assert f.grounding == CONFLICT
+
+
+def test_code_labels_are_stripped():
+    assert normalize("code", "No. 0420") == "0420"
+    assert normalize("code", "#2025 02655") == "2025 02655"
+    assert normalize("code", "NORTH-1") == "NORTH-1"  # not a label
+    assert normalize("code", "No 0420") == "0420" and normalize("code", "NO:12") == "12"
+
+
+def test_numbers_conflict_rule():
+    from app.extraction.normalize import numbers_conflict
+    assert numbers_conflict("LOT 20 BLOCK 21", "LOT 20 BLOCK 23")
+    assert not numbers_conflict("PUROK 1 PUYPUY BAY", "PUROK 1 PUYPUY 4033 BAY")  # zip omitted
+    assert not numbers_conflict("REAL ST", "REAL ST")

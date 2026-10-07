@@ -7,7 +7,15 @@ import cv2
 import numpy as np
 
 from app.extraction.fields import SPECS, FieldSpec, specs_for
-from app.extraction.grounding import CONFLICT, EXACT, FUZZY, NOT_FOUND, ground
+from app.extraction.grounding import (
+    CONFLICT,
+    CROSS_CHECKED,
+    EXACT,
+    FUZZY,
+    NOT_FOUND,
+    UNVERIFIABLE,
+    ground,
+)
 from app.extraction.normalize import normalize
 from app.extraction.prompts import output_schema, user_prompt
 from app.extraction.providers import ExtractionError, ModelOutput, VisionProvider
@@ -16,7 +24,8 @@ from app.extraction.validate import Issue, check_fields, check_validity
 MAX_PAGES = 5
 MAX_IMAGE_SIDE = 1568  # larger images cost more tokens without reading better
 
-_GROUNDING_CONFIDENCE = {EXACT: 0.95, FUZZY: 0.8, NOT_FOUND: 0.5, CONFLICT: 0.3}
+_GROUNDING_CONFIDENCE = {EXACT: 0.95, FUZZY: 0.8, NOT_FOUND: 0.5, UNVERIFIABLE: 0.5,
+                         CONFLICT: 0.3}
 _QUALITY_FACTOR = {"GOOD": 1.0, "FAIR": 0.9, "POOR": 0.75, "UNREADABLE": 0.6}
 
 
@@ -108,9 +117,31 @@ def _field_result(spec: FieldSpec, item: dict | None, pages: list[PageInput]) ->
     elif g.status == NOT_FOUND:
         issues.append(Issue("NOT_IN_OCR_TEXT", "Value could not be confirmed by OCR; check "
                             "the image", spec.name, "INFO").as_dict())
+    elif g.status == UNVERIFIABLE:
+        issues.append(Issue("CHECKBOX_NOT_VERIFIED", "Checkbox: confirm which box is marked "
+                            "on the image", spec.name, "INFO").as_dict())
     return FieldResult(spec.name, spec.kind, value, normalized,
                        (item.get("evidence") or None), page, g.status, g.matched,
                        round(confidence, 2), spec.zoho_field, issues)
+
+
+def check_branch_code(results: dict[str, FieldResult]) -> Issue | None:
+    """BIR 2303: TIN branch code 00000 = Head Office, anything else = Branch. Confirms (or
+    contradicts) the Head Office/Branch checkbox, which OCR text alone cannot verify."""
+    tin, office = results.get("tin"), results.get("registering_office")
+    if not tin or not office or not tin.normalized or not office.normalized:
+        return None
+    branch = tin.normalized[-5:]
+    expected = "HEAD OFFICE" if branch == "00000" else "BRANCH"
+    if office.normalized == expected:
+        office.grounding, office.confidence, office.issues = CROSS_CHECKED, 0.9, []
+        return None
+    office.grounding, office.confidence = CONFLICT, 0.2
+    issue = Issue("BRANCH_MISMATCH", f"TIN branch code {branch} means "
+                  f"{'Head Office' if branch == '00000' else 'Branch'}, but the "
+                  f"'{office.value}' box was read as marked", "registering_office", "CRITICAL")
+    office.issues = [issue.as_dict()]
+    return issue
 
 
 def extract_document(pages: list[PageInput], expected_type: str, provider: VisionProvider,
@@ -139,6 +170,8 @@ def extract_document(pages: list[PageInput], expected_type: str, provider: Visio
 
     raw_fields = out.data.get("fields") or {}
     results = {s.name: _field_result(s, raw_fields.get(s.name), pages) for s in specs}
+    if doc_type == "BIR_2303" and (branch_issue := check_branch_code(results)):
+        issues.append(branch_issue)
     raw = {k: r.value for k, r in results.items()}
     normalized = {k: r.normalized for k, r in results.items()}
     issues += check_fields(specs, raw, normalized)

@@ -14,8 +14,10 @@ Zoho field it maps to (`app/extraction/fields.py`).
 |---|---|---|
 | EXACT | value (or a known rendering, e.g. 2021-05-11 = "11 May 2021") is in the OCR text | 0.95 |
 | FUZZY | names/addresses only: close match, OCR typo | 0.80 |
+| CROSS_CHECKED | confirmed by a rule instead of OCR (BIR: TIN branch code 00000 = Head Office) | 0.90 |
 | NOT_FOUND | OCR can't confirm it (often low-res tables): reviewer checks the image | 0.50 |
-| CONFLICT | TIN/code/number/date/money: OCR read something close but different | 0.30 |
+| UNVERIFIABLE | checkbox field: every option is printed, OCR can't tell which is marked | 0.50 |
+| CONFLICT | TIN/code/number/date/money: OCR read something close but different; also any text field whose numbers disagree ("BLOCK 21" vs "BLOCK 23") | 0.30 |
 
 Confidence is multiplied by page quality (FAIR 0.9, POOR 0.75). Invalid TIN/date/amount → 0.2.
 The model's own confidence is not used: it is not calibrated.
@@ -49,6 +51,18 @@ The adapter uses OpenAI's Responses API with a strict JSON schema, `store: false
 not kept on OpenAI's side), no temperature (reasoning models don't accept it) and an 8000-token
 output limit (reasoning tokens count toward it). An `incomplete` reply is reported as a failure,
 never half-parsed.
+
+## Benchmark result (7 real documents, 71 fields, 2026-10-06)
+
+| Model | Correct | Wrong but looked confirmed | Tokens in / out |
+|---|---|---|---|
+| gpt-6.1-sol | 65/71 (92%) | **0** | 21.5k / 3.8k |
+| gpt-6-luna | 65/71 (92%) | 3 (incl. Head Office vs Branch) | 21.5k / 4.1k |
+
+**Chosen: `gpt-6.1-sol`** (about US$0.035 per 3-document verification). Fixes made from this run:
+checkbox fields marked UNVERIFIABLE + BIR branch-code cross-check (BRANCH_MISMATCH is CRITICAL);
+changed numbers inside addresses/names are CONFLICT, a missing postal code is not; "No." labels
+stripped from codes; prompt rules for labels, long digit strings and checkboxes (`ph-docs-2`).
 
 ## Choose a provider: benchmark on the gold set
 

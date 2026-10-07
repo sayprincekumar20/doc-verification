@@ -44,3 +44,10 @@ def test_gold_value_can_list_acceptable_answers(tmp_path):
         "territorial_scope": ["CITY/MUNICIPALITY", "MUNICIPALITY"]}}}
     fake = FakeVision({"territorial_scope": "MUNICIPALITY"}, "DTI_BN_CERT")
     assert evaluate(gold, [tmp_path], fake, date(2025, 1, 1))["outcomes"] == {"CORRECT": 1}
+
+
+def test_compare_digits_in_addresses_and_labels():
+    assert compare("address", "LOT20, BLOCK21 VITO CRUZ", "LOT 20, BLOCK 23 VITO CRUZ") == DIFFERENT
+    assert compare("address", "PUROK 1 PUPUY 4033 BAY", "PUROK 1 PUYPUY 4033 BAY") == MINOR_DIFF
+    assert compare("code", "No. 0420", "0420") == SAME
+    assert compare("choice", "Head Office", "Branch") == DIFFERENT

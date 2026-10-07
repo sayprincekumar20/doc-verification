@@ -11,9 +11,10 @@ from dataclasses import dataclass
 class FieldSpec:
     name: str
     description: str
-    kind: str = "text"          # text | name | address | date | tin | number | money | code
+    kind: str = "text"   # text | name | address | date | tin | number | money | code | choice
     required: bool = False
     zoho_field: str | None = None
+    options: tuple[str, ...] = ()   # for kind="choice" (printed checkboxes)
 
 
 SPECS: dict[str, list[FieldSpec]] = {
@@ -27,7 +28,8 @@ SPECS: dict[str, list[FieldSpec]] = {
         FieldSpec("taxpayer_type", "TAXPAYER TYPE/S, e.g. SINGLE PROPRIETORSHIP ONLY "
                   "(RESIDENT CITIZEN) or DOMESTIC CORPORATION", "text", True,
                   "Type_of_Business_Organization"),
-        FieldSpec("registering_office", "Which box is marked: Head Office or Branch", "text"),
+        FieldSpec("registering_office", "Which REGISTERING OFFICE box is marked with X: "
+                  "Head Office or Branch", "choice", options=("Head Office", "Branch")),
         FieldSpec("rdo_code", "Revenue District Office number, 3 digits, e.g. 056", "code"),
         FieldSpec("tin_issuance_date", "TIN ISSUANCE DATE", "date"),
         FieldSpec("registration_date", "REGISTRATION DATE in Business Information Details",
