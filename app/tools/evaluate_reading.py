@@ -26,6 +26,7 @@ from pathlib import Path
 from app.pipeline.file_checks import check_file
 from app.reading.classify import classify_text
 from app.reading.pipeline import read_document
+from app.tools.sample_files import find, index_files
 
 
 def _n(value: str) -> str:
@@ -33,10 +34,10 @@ def _n(value: str) -> str:
 
 
 def evaluate(gold: dict, roots: list[Path]) -> dict:
-    index = {p.name: p for root in roots for p in root.rglob("*") if p.is_file()}
+    index = index_files(roots)
     results = []
     for name, expected in gold.items():
-        path = index.get(name)
+        path = find(index, name)
         if path is None:
             results.append({"file": name, "error": "file not found"})
             continue
@@ -47,7 +48,8 @@ def evaluate(gold: dict, roots: list[Path]) -> dict:
         text = "\n".join(p.grounding_text for p in pages)
         cls = classify_text(text, name)
         fields = expected.get("fields", {})
-        found = {k: _n(v) in _n(text) for k, v in fields.items() if _n(v)}
+        found = {k: any(_n(x) in _n(text) for x in (v if isinstance(v, list) else [v]))
+                 for k, v in fields.items() if v}
         results.append({
             "file": name,
             "expected_type": expected.get("document_type"),

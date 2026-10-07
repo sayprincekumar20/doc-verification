@@ -35,3 +35,12 @@ def test_evaluate_counts_outcomes_and_silent_errors(tmp_path):
     assert report["outcomes"] == {"WRONG": 1, "CORRECT": 2, "MISSED": 1}
     assert report["wrong_but_looked_confirmed"] == 0       # the wrong digit was flagged
     assert report["wrong_by_grounding"] == {"CONFLICT": 1}
+
+
+@pytest.mark.skipif(shutil.which("tesseract") is None, reason="Tesseract not installed")
+def test_gold_value_can_list_acceptable_answers(tmp_path):
+    (tmp_path / "dti.pdf").write_bytes(sd.digital_pdf())
+    gold = {"dti.pdf": {"document_type": "DTI_BN_CERT", "fields": {
+        "territorial_scope": ["CITY/MUNICIPALITY", "MUNICIPALITY"]}}}
+    fake = FakeVision({"territorial_scope": "MUNICIPALITY"}, "DTI_BN_CERT")
+    assert evaluate(gold, [tmp_path], fake, date(2025, 1, 1))["outcomes"] == {"CORRECT": 1}

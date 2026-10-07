@@ -6,6 +6,9 @@
 Provider/model/keys default to EXTRACTION_PROVIDER, EXTRACTION_MODEL, ANTHROPIC_API_KEY /
 OPENAI_API_KEY in .env. Run once per provider to compare them on the same documents.
 
+A gold value may be a list of acceptable answers, e.g. ["CITY OF TACLOBAN",
+"City Government of Tacloban"], when the document prints the same thing two ways.
+
 Per field:   CORRECT | MINOR_DIFF | WRONG | MISSED (value on the document, model returned null)
 Most important number: WRONG values whose grounding was EXACT/FUZZY ("wrong but looked
 confirmed"); these are the errors a reviewer could miss.
@@ -29,6 +32,7 @@ from app.pipeline.file_checks import check_file
 from app.reading.classify import classify_text
 from app.reading.pipeline import read_document
 from app.tools.envfile import read_env
+from app.tools.sample_files import find, index_files
 
 
 def _jpeg(image) -> bytes:
@@ -37,11 +41,11 @@ def _jpeg(image) -> bytes:
 
 
 def evaluate(gold: dict, roots: list[Path], provider: VisionProvider, today: date) -> dict:
-    index = {p.name: p for root in roots for p in root.rglob("*") if p.is_file()}
+    index = index_files(roots)
     docs, outcome, grounding_of_wrong = [], Counter(), Counter()
     tokens_in = tokens_out = 0
     for name, expected in gold.items():
-        path = index.get(name)
+        path = find(index, name)
         if path is None:
             docs.append({"file": name, "error": "file not found"})
             continue
@@ -61,7 +65,10 @@ def evaluate(gold: dict, roots: list[Path], provider: VisionProvider, today: dat
                 continue
             got = result.fields.get(field_name)
             value = got.value if got else None
-            verdict = compare(kinds[field_name], value, true_value)
+            accepted = true_value if isinstance(true_value, list) else [true_value]
+            verdicts = [compare(kinds[field_name], value, t) for t in accepted]
+            verdict = (SAME if SAME in verdicts else
+                       MINOR_DIFF if MINOR_DIFF in verdicts else DIFFERENT)
             label = ("MISSED" if value is None else
                      {SAME: "CORRECT", MINOR_DIFF: "MINOR_DIFF", DIFFERENT: "WRONG"}[verdict])
             outcome[label] += 1
