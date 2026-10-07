@@ -36,6 +36,7 @@ class JobStatus(enum.StrEnum):
     READ = "READ"                    # pages + text ready; final when extraction is disabled
     EXTRACTING = "EXTRACTING"        # vision model extracting key-value fields
     EXTRACTED = "EXTRACTED"          # every document has normalized, grounded fields
+    ASSESSED = "ASSESSED"            # cross-checks, Zoho proposals, recommendation ready
     NO_DOCUMENTS = "NO_DOCUMENTS"    # nothing usable found on the account
     FAILED = "FAILED"
 
@@ -218,4 +219,18 @@ class DocumentExtraction(Base):
     output_tokens: Mapped[int] = mapped_column(default=0)
     calls: Mapped[int] = mapped_column(default=0)
     seconds: Mapped[float | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class JobAssessment(Base):
+    """Phase 1D result for a job: cross-document checks, Zoho change proposals, requirements
+    and the preliminary recommendation. Input for the human review in Zoho CRM."""
+
+    __tablename__ = "job_assessments"
+
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("verification_jobs.id", ondelete="CASCADE"), primary_key=True)
+    rules_version: Mapped[str] = mapped_column(String(40))
+    recommendation: Mapped[str] = mapped_column(String(20))   # ACTIVE | INACTIVE | MANUAL_REVIEW
+    assessment: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

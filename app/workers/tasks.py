@@ -7,8 +7,9 @@ from app.db.models import JobStatus, VerificationJob
 from app.db.session import session_scope
 from app.extraction.providers import TransientExtractionError, build_provider
 from app.logging import setup_logging
+from app.pipeline.assess import assess_job
 from app.pipeline.collect import collect_job
-from app.pipeline.extract import extract_job
+from app.pipeline.extract import extract_job, extraction_version, manila_today
 from app.pipeline.read import read_job
 from app.services.audit import record_event
 from app.storage.base import build_storage
@@ -103,6 +104,7 @@ def extract_documents(self, job_id: str) -> str:
             if job is None or job.status != JobStatus.EXTRACTING:
                 return job.status if job else "missing"
             extract_job(db, job, build_storage(get_settings()), provider)
+            assess_job(db, job, extraction_version(provider), manila_today())  # Phase 1D
             return job.status
     except TransientExtractionError as exc:
         if self.request.retries < 5:

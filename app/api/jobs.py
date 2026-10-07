@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_enqueuer, require_api_key
-from app.db.models import VerificationJob
+from app.db.models import JobAssessment, VerificationJob
 from app.db.session import get_db
 from app.schemas import JobCreate, JobCreated, JobOut
 from app.services.jobs import create_or_get_active_job
@@ -36,3 +36,14 @@ def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)) -> VerificationJob
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found")
     return job
+
+
+@router.get("/{job_id}/assessment")
+def get_assessment(job_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    """Phase 1D result: recommendation, reasons, requirements, cross-document checks and the
+    proposed Zoho changes (FILL / CORRECT / MATCH / HOLD / ...) with their evidence."""
+    row = db.get(JobAssessment, job_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No assessment for this job yet")
+    return {"job_id": str(job_id), "recommendation": row.recommendation,
+            "rules_version": row.rules_version, **row.assessment}

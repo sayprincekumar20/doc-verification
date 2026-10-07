@@ -46,6 +46,16 @@ How to read a field line: `tin  601-088-612-00000  [EXACT 0.95]`
 | NOT_FOUND | OCR couldn't confirm | Look at the image |
 | CONFLICT | OCR read a different number/date | Look at the image: one of them is wrong |
 
+## 3b. Full assessment (recommendation + proposed Zoho changes)
+
+```cmd
+docker compose run --rm --no-deps api python scripts/assess_account.py samples/<account_id> --quiet
+```
+
+Uses the Zoho Account saved by `fetch_account.py` and prints: recommendation and reasons, required
+documents, documents vs each other, and every proposed Zoho change. Saved to
+`samples\<account_id>\assessment.json`.
+
 ## 4. Add the customer to the gold set (to measure accuracy)
 
 ```cmd
