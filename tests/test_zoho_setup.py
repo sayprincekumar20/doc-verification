@@ -180,3 +180,13 @@ def test_env_file_with_windows_bom(tmp_path):
     path = tmp_path / ".env"
     path.write_bytes("\ufeffZOHO_CLIENT_ID=1000.CLIENT\r\nZOHO_CLIENT_SECRET=s\r\n".encode())
     assert read_env(path)["ZOHO_CLIENT_ID"] == "1000.CLIENT"
+
+
+def test_env_option_works_before_or_after_the_command(tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(zoho_auth, "cmd_exchange", lambda args: seen.append(args.env) or 0)
+    env = str(tmp_path / ".env.sandbox")
+    assert zoho_auth.main(["exchange-code", "--env", env, "--code", "x"]) == 0
+    assert zoho_auth.main(["--env", env, "exchange-code", "--code", "x"]) == 0
+    assert zoho_auth.main(["exchange-code", "--code", "x"]) == 0
+    assert seen == [env, env, ".env"]

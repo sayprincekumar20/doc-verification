@@ -163,15 +163,19 @@ def cmd_revoke(args: argparse.Namespace, http: httpx.Client | None = None) -> in
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Zoho OAuth setup for the verification engine")
     parser.add_argument("--env", default=".env", help="path to the .env file (default: .env)")
+    # --env also accepted after the command: "zoho_auth.py exchange-code --env .env.sandbox"
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--env", default=argparse.SUPPRESS, help="path to the .env file")
     sub = parser.add_subparsers(dest="command", required=True)
-    sc = sub.add_parser("scopes", help="print the scopes for the API Console")
+    sc = sub.add_parser("scopes", parents=[common], help="print the scopes for the API Console")
     sc.add_argument("--setup", action="store_true",
                     help="include the scopes for creating the review module (one-time setup)")
-    ex = sub.add_parser("exchange-code", help="exchange a grant code for a refresh token")
+    ex = sub.add_parser("exchange-code", parents=[common],
+                        help="exchange a grant code for a refresh token")
     ex.add_argument("--code", help="grant code (omit to be prompted, hidden)")
-    te = sub.add_parser("test", help="verify credentials and scopes")
+    te = sub.add_parser("test", parents=[common], help="verify credentials and scopes")
     te.add_argument("--account-id", help="also check Notes/Attachments for this Account")
-    sub.add_parser("revoke", help="revoke the refresh token in .env")
+    sub.add_parser("revoke", parents=[common], help="revoke the refresh token in .env")
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
