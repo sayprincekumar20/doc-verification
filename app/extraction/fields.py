@@ -55,8 +55,9 @@ SPECS: dict[str, list[FieldSpec]] = {
     ],
     "MAYORS_PERMIT": [
         FieldSpec("business_name", "Business Name", "name", True, "Invoice_Company_Name"),
-        FieldSpec("owner_name", "Proprietor/Owner or Taxpayer's Name of the business. Never the "
-                  "mayor or another signing official", "name", True, "Owner_Name"),
+        FieldSpec("owner_name", "Proprietor/Owner or Taxpayer's Name of the business, if printed "
+                  "(corporate permits often have none). Never the mayor or another signing "
+                  "official", "name", False, "Owner_Name"),
         FieldSpec("business_address", "Business Address", "address", False, "Billing_Street"),
         FieldSpec("permit_status", "NEW or RENEW, if printed", "text"),
         FieldSpec("permit_number", "Business/Mayor's Permit No.", "code", True,

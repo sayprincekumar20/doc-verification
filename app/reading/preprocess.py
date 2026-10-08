@@ -134,6 +134,14 @@ def grayscale(rgb: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
 
 
+def adaptive_binarize(gray: np.ndarray) -> np.ndarray:
+    """Local threshold. Tesseract's single global threshold fails on photos with large dark
+    areas (dark desk, black seal, grey footer band): a Makati permit read as one word
+    ('TOTAL'); adaptive thresholding read 259 words."""
+    return cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                 cv2.THRESH_BINARY, 31, 15)
+
+
 def ink_filter(gray: np.ndarray, percentile: float = 8.0) -> np.ndarray:
     """Keep only the darkest strokes. Removes light security backgrounds such as the repeated
     "BUREAU OF INTERNAL REVENUE" pattern on BIR 2303 (photo: 8/11 -> 10/11 values found)."""

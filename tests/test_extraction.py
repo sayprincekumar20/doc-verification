@@ -228,3 +228,7 @@ def test_invalid_ocn_format_and_rdo_mismatch():
 
 def test_enye_matches_plain_n_in_ocr():
     assert ground("CITY OF DASMARIÑAS", "text", "CITY OF DASMARINAS CAVITE").status == EXACT
+
+
+def test_of_in_dates():
+    assert parse_date("31 of December 2026").isoformat() == "2026-12-31"

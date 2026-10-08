@@ -5,7 +5,7 @@ import numpy as np
 
 from app.reading.normalize import RawPage, to_pages
 from app.reading.ocr import DEFAULT_LANG, OcrResult, run_ocr
-from app.reading.preprocess import Prepared, ink_filter, prepare
+from app.reading.preprocess import Prepared, adaptive_binarize, ink_filter, prepare
 from app.reading.quality import Quality, assess
 
 
@@ -23,7 +23,13 @@ class PageResult:
 
 
 SECOND_PASS_BELOW_CONF = 80.0
+SECOND_PASS_BELOW_WORDS = 40   # a business document page has far more words than this
 PHOTO_MIN_LONG_SIDE = 2000
+
+
+def _readable_words(result: OcrResult) -> int:
+    return sum(1 for w in result.words
+               if w.conf >= 70 and len(w.text) >= 3 and w.text.isalpha())
 
 
 def _read_page(raw: RawPage, lang: str) -> PageResult:
@@ -38,10 +44,22 @@ def _read_page(raw: RawPage, lang: str) -> PageResult:
     else:
         ocr = run_ocr(prepared.ocr, lang=lang)
         text, method, grounding = ocr.text, "ocr", ocr.text
-        if ocr.mean_conf < SECOND_PASS_BELOW_CONF:
-            # Low confidence: often a security background. Read the dark ink only as well.
-            ink = run_ocr(ink_filter(prepared.ocr), lang=lang)
-            grounding, method = f"{ocr.text}\n{ink.text}", "ocr+ink"
+        low_conf = ocr.mean_conf < SECOND_PASS_BELOW_CONF
+        few_words = len(ocr.words) < SECOND_PASS_BELOW_WORDS
+        if low_conf or few_words:
+            # Weak first reading. Low confidence usually means a security background (BIR
+            # watermark): read the dark ink only. Very few words usually means dark areas broke
+            # Tesseract's global threshold (Makati permit: 1 word): threshold locally. The
+            # adaptive pass is NOT run on watermarked pages: it turns the pattern into noise
+            # and made one scanned 2303 take 230 s instead of 25 s.
+            readings = {"ocr": ocr, "ink": run_ocr(ink_filter(prepared.ocr), lang=lang)}
+            if few_words:
+                readings["adaptive"] = run_ocr(adaptive_binarize(prepared.ocr), lang=lang)
+            best = max(readings, key=lambda k: _readable_words(readings[k]))
+            ocr = readings[best]
+            text = ocr.text
+            grounding = "\n".join(r.text for r in readings.values())
+            method = "ocr+ink" if best == "ocr" else f"ocr+{best}"
         quality = assess(raw.image, prepared.ocr, ocr.mean_conf, len(ocr.words))
     return PageResult(raw.page_number, raw.source, text, grounding, method, ocr, quality,
                       prepared, round(time.monotonic() - started, 2))

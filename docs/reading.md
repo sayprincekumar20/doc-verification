@@ -13,9 +13,14 @@ After collection, the worker reads every stored file (`read_documents` task):
      one with the most confidently read words wins (OSD guessed wrong on a sideways permit photo).
    - Document edge crop + perspective correction, **camera photos only** (it cut table cells on scans).
    - Deskew (±5°), resize to 2400 px long side.
-3. **OCR** (`ocr.py`): Tesseract on plain grayscale. When mean confidence is below 80, a second
-   pass reads only the dark ink, which removes the BIR "BUREAU OF INTERNAL REVENUE" background.
-   Both texts are kept as `grounding_text`, used later to cross-check AI-extracted values.
+3. **OCR** (`ocr.py`): Tesseract on plain grayscale. Extra passes for weak first readings:
+   - mean confidence < 80 (security backgrounds like the BIR "BUREAU OF INTERNAL REVENUE"
+     pattern): a pass that reads only the dark ink;
+   - fewer than 40 words (large dark areas break Tesseract's global threshold; a Makati permit
+     photo read as just "TOTAL"): the ink pass plus a locally (adaptively) thresholded pass.
+   The reading with the most clearly read words becomes the page text; all readings are kept as
+   `grounding_text`, used later to cross-check AI-extracted values. The adaptive pass is not
+   used on watermarked pages (it made a scanned 2303 take 230 s instead of 25 s).
 4. **Quality** (`quality.py`): GOOD / FAIR / POOR / UNREADABLE from OCR confidence, sharpness and
    resolution, with reasons (e.g. "low resolution").
 5. **Classify** (`classify.py`): keyword evidence for BIR_2303, DTI_BN_CERT, MAYORS_PERMIT,
@@ -26,6 +31,9 @@ Results are stored per **file content** (`file_readings`, `file_pages`, keyed by
 `PIPELINE_VERSION`), with the cleaned page image saved to storage. The same file is never read
 twice, even across accounts. Bump `PIPELINE_VERSION` in `app/pipeline/read.py` when the reading
 logic changes.
+
+Update 2026-10-08 (`read-1.1`): 12 real documents / 6 customers, classification 12/12,
+grounding recall 99/123 (80%); the Makati permit went from 1 word (UNREADABLE) to FAIR.
 
 ## Measured on 7 real documents (3 customers)
 

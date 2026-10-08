@@ -24,6 +24,7 @@ def parse_date(value: str) -> date | None:
         return None
     s = re.sub(r"(\d)(st|nd|rd|th)\b", r"\1", str(value).strip().lower())
     s = s.replace("day of", "").replace(",", " ").replace(".", " ")
+    s = re.sub(r"\bof\b", " ", s)  # "31 of December 2026" (Makati permits)
     s = re.sub(r"\s+", " ", s).strip()
     try:
         if m := re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s):

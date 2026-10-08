@@ -145,3 +145,45 @@ def test_bir_2303_still_wins_over_id_signals():
     text = ("BIR FORM 2303 CERTIFICATE OF REGISTRATION TIN & BRANCH CODE NAME OF TAXPAYER "
             "SIGNATURE ISSUE DATE")
     assert classify_text(text).document_type == "BIR_2303"
+
+
+@needs_tesseract
+def test_page_with_few_words_gets_adaptive_pass(monkeypatch):
+    """A first reading with almost no words (dark areas broke the global threshold, e.g. a
+    Makati permit read as just 'TOTAL') triggers ink + adaptive passes; the best one wins."""
+    from app.reading import pipeline
+    from app.reading.ocr import OcrResult, Word
+
+    calls = []
+    real = pipeline.run_ocr
+
+    def fake_run_ocr(gray, lang="eng"):
+        calls.append(gray)
+        if len(calls) == 1:
+            return OcrResult("TOTAL", 96.0, [Word("TOTAL", 96.0, (0, 0, 1, 1), (1, 1, 1))])
+        return real(gray, lang)
+
+    monkeypatch.setattr(pipeline, "run_ocr", fake_run_ocr)
+    page = read_document(sd.to_bytes(sd.page_image()), "image/png")[0]
+    assert len(calls) == 3                       # plain, ink, adaptive
+    assert page.text_method in ("ocr+ink", "ocr+adaptive")
+    assert "1234567" in page.text and "TOTAL" in page.grounding_text
+
+
+@needs_tesseract
+def test_low_confidence_with_many_words_skips_adaptive_pass(monkeypatch):
+    """Watermarked pages (low confidence, many words) get only the ink pass: the adaptive pass
+    turns the watermark into noise and made a scanned 2303 take 230 s."""
+    from app.reading import pipeline
+    monkeypatch.setattr(pipeline, "SECOND_PASS_BELOW_CONF", 101.0)
+    calls = []
+    real = pipeline.run_ocr
+    monkeypatch.setattr(pipeline, "run_ocr", lambda g, lang="eng": calls.append(1) or real(g, lang))
+    read_document(sd.to_bytes(sd.page_image()), "image/png")
+    assert len(calls) == 2                       # plain + ink only
+
+
+def test_makati_permit_wording_is_a_mayors_permit():
+    text = ("CITY OF MAKATI BUSINESS PERMITS OFFICE PERMIT NO 17219 PAHINTULOT SA PANGANGALAKAL "
+            "(BUSINESS PERMIT) PUNONG LUNGSOD")
+    assert classify_text(text).document_type == "MAYORS_PERMIT"

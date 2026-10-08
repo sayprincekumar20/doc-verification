@@ -30,7 +30,7 @@ from app.tools.sample_files import find, index_files
 
 
 def _n(value: str) -> str:
-    return re.sub(r"[^A-Z0-9]", "", str(value).upper())
+    return re.sub(r"[^A-Z0-9]", "", str(value).upper().replace("Ñ", "N"))
 
 
 def evaluate(gold: dict, roots: list[Path]) -> dict:

@@ -30,7 +30,7 @@ from app.storage.base import Storage
 log = logging.getLogger(__name__)
 
 # Bump when preprocessing/OCR/classification changes, so files are re-read with the new logic.
-PIPELINE_VERSION = "read-1.0"
+PIPELINE_VERSION = "read-1.1"  # 1.1: adaptive-threshold pass for pages with few words
 
 
 def _jpeg(image) -> bytes:
