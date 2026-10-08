@@ -212,6 +212,12 @@ class ZohoClient:
             raise ZohoNotFoundError("Current user not returned")
         return users[0]
 
+    def list_modules(self) -> list[dict[str, Any]]:
+        return self._get_json("/settings/modules").get("modules") or []
+
+    def get_fields(self, module: str) -> list[dict[str, Any]]:
+        return self._get_json("/settings/fields", {"module": module}).get("fields") or []
+
     def count_fields(self, module: str) -> int:
         return len(self._get_json("/settings/fields", {"module": module}).get("fields") or [])
 

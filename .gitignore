@@ -9,3 +9,7 @@ data/
 
 # Real customer documents fetched for testing. Never commit.
 samples/
+
+# Other environments (sandbox etc.) hold secrets too
+.env.*
+!.env.example

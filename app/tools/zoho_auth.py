@@ -34,6 +34,7 @@ SCOPES = [
     "ZohoCRM.modules.notes.READ",
     "ZohoCRM.modules.attachments.READ",
     "ZohoCRM.settings.fields.READ",
+    "ZohoCRM.settings.modules.READ",
     "ZohoCRM.users.READ",
     "ZohoCRM.Files.READ",
 ]
