@@ -10,14 +10,35 @@ Setup (gear) -> Developer Hub / Developer Space -> **Sandbox** -> Create Sandbox
 `DocVerification-Test`. Copy configuration (metadata); include sample Accounts if your plan allows.
 Open the sandbox (a banner shows you are in the sandbox).
 
+## Faster: let the script create it
+
+Instead of steps 2-4 by hand:
+
+1. Token with setup scopes: `python scripts/zoho_auth.py scopes --setup` -> new grant code in the
+   API Console (as an admin) -> `python scripts/zoho_auth.py exchange-code --env .env.sandbox`
+2. Dry run, then create:
+
+```cmd
+python scripts/create_zoho_review_module.py --env .env.sandbox
+python scripts/create_zoho_review_module.py --env .env.sandbox --apply
+```
+
+3. In Zoho add the subform (Zoho's API can't create subforms): Setup > Modules and Fields >
+   Document Verifications > Standard layout > drag **Subform** in, name it **Proposed Changes**,
+   one Single Line column **Zoho Field**, Save.
+4. Run `--apply` again: it adds the other 10 subform columns. Then step 5 (list views) by hand and
+   step 7 (checker).
+
+The script only creates what is missing (safe to re-run) and refuses non-sandbox domains.
+
 ## 2. Create the module
 
 Setup -> Customization -> **Modules and Fields** -> **Create New Module**.
 - Plural name: **Document Verifications**
 - Singular name: **Document Verification**
 
-Zoho adds a mandatory name field ("Document Verification Name"): keep it (the engine fills it with
-the account name).
+Zoho adds a mandatory name field ("Document Verification Name"): change it to an **Auto-Number**
+field labelled **DV Number** (prefix `DV`, start 1), or keep it and add DV Number separately.
 
 ## 3. Fields (drag from the left panel into the layout)
 
@@ -28,7 +49,7 @@ Time, Reviewer Notes, Values Compared).
 
 | Label | Field type | Settings |
 |---|---|---|
-| DV Number | Auto-Number | Prefix DV-, starting number 1 |
+| DV Number | Auto-Number | The module's name field: Auto-Number, prefix DV (letters/numbers only), start 1 |
 | Account | Lookup | lookup module: **Accounts** |
 | Review Status | Pick List | values (exactly, in this order): `Pending Review`, `In Review`, `Waiting for Documents`, `Approved`, `Applied`, `Rejected`, `Conflict`, `Failed`; Default: Pending Review |
 | Recommendation | Pick List | values (exactly, in this order): `ACTIVE`, `INACTIVE`, `MANUAL_REVIEW` |
@@ -52,7 +73,7 @@ Drag **Subform** into the layout (new section "Proposed Changes"), label **Propo
 
 | Label | Field type | Settings |
 |---|---|---|
-| Zoho Field | Single Line | API name of the Account field, e.g. Owner_Name |
+| Zoho Field | Single Line | API name of the Account field, e.g. Owner_Name. Create the subform with this first column; the setup script adds the rest |
 | Field Label | Single Line |  |
 | Current Value | Single Line |  |
 | Proposed Value | Single Line | Reviewer may edit |

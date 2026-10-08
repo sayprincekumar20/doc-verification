@@ -1,5 +1,6 @@
 """Minimal Zoho CRM REST client with retries, token refresh and pagination."""
 
+import json
 import logging
 import random
 import time
@@ -211,6 +212,35 @@ class ZohoClient:
         if not users:
             raise ZohoNotFoundError("Current user not returned")
         return users[0]
+
+    def list_profiles(self) -> list[dict[str, Any]]:
+        return self._get_json("/settings/profiles").get("profiles") or []
+
+    def _post_settings(self, path: str, body: dict, key: str,
+                       params: dict | None = None) -> list[dict[str, Any]]:
+        """POST to a settings API; returns Zoho's per-item results (also on HTTP 400, so
+        the caller can show which item failed and why)."""
+        try:
+            resp = self._request("POST", path, params=params, json=body)
+            return resp.json().get(key) or []
+        except ZohoAPIError as exc:
+            try:
+                parsed = json.loads(exc.body)
+            except ValueError:
+                raise exc from None
+            items = parsed.get(key) if isinstance(parsed, dict) else None
+            if items:
+                return items
+            raise
+
+    def create_module(self, body: dict) -> list[dict[str, Any]]:
+        """POST /settings/modules (scope ZohoCRM.settings.modules.CREATE)."""
+        return self._post_settings("/settings/modules", body, "modules")
+
+    def create_fields(self, module: str, fields: list[dict]) -> list[dict[str, Any]]:
+        """POST /settings/fields?module= (max 5 fields; scope ZohoCRM.settings.fields.CREATE)."""
+        return self._post_settings("/settings/fields", {"fields": fields}, "fields",
+                                   {"module": module})
 
     def list_modules(self) -> list[dict[str, Any]]:
         return self._get_json("/settings/modules").get("modules") or []

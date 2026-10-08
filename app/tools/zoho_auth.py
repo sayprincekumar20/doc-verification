@@ -38,6 +38,12 @@ SCOPES = [
     "ZohoCRM.users.READ",
     "ZohoCRM.Files.READ",
 ]
+# Extra scopes only for scripts/create_zoho_review_module.py (one-time setup, admin user).
+SETUP_SCOPES = [
+    "ZohoCRM.settings.modules.CREATE",
+    "ZohoCRM.settings.fields.CREATE",
+    "ZohoCRM.settings.profiles.READ",
+]
 DEFAULT_ACCOUNTS_URL = "https://accounts.zoho.com"
 DEFAULT_API_DOMAIN = "https://www.zohoapis.com"
 
@@ -65,8 +71,8 @@ def build_client(settings: Settings, http: httpx.Client | None = None) -> ZohoCl
     return ZohoClient(settings, tokens, http=http)
 
 
-def cmd_scopes(_: argparse.Namespace) -> int:
-    print(",".join(SCOPES))
+def cmd_scopes(args: argparse.Namespace) -> int:
+    print(",".join(SCOPES + (SETUP_SCOPES if getattr(args, "setup", False) else [])))
     return 0
 
 
@@ -158,7 +164,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Zoho OAuth setup for the verification engine")
     parser.add_argument("--env", default=".env", help="path to the .env file (default: .env)")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("scopes", help="print the scopes for the API Console")
+    sc = sub.add_parser("scopes", help="print the scopes for the API Console")
+    sc.add_argument("--setup", action="store_true",
+                    help="include the scopes for creating the review module (one-time setup)")
     ex = sub.add_parser("exchange-code", help="exchange a grant code for a refresh token")
     ex.add_argument("--code", help="grant code (omit to be prompted, hidden)")
     te = sub.add_parser("test", help="verify credentials and scopes")

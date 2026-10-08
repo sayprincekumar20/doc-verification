@@ -17,7 +17,8 @@ class Block:
             raise ImportError('blocked by policy: ' + name)
         return None
 sys.meta_path.insert(0, Block())
-import app.tools.zoho_auth, app.tools.fetch_account, app.tools.check_zoho_setup
+import app.tools.zoho_auth, app.tools.fetch_account
+import app.tools.check_zoho_setup, app.tools.create_zoho_review_module
 print('ok')
 """
 
