@@ -87,11 +87,17 @@ def cmd_exchange(args: argparse.Namespace, http: httpx.Client | None = None) -> 
                                env["ZOHO_CLIENT_ID"], env["ZOHO_CLIENT_SECRET"], code, http=http)
     set_env_value(env_path, "ZOHO_REFRESH_TOKEN", body["refresh_token"])
     api_domain = body.get("api_domain")
-    if api_domain and api_domain != (env.get("ZOHO_API_DOMAIN") or DEFAULT_API_DOMAIN):
+    configured = env.get("ZOHO_API_DOMAIN")
+    # Never overwrite a configured domain: Zoho returns the production domain here even for
+    # tokens used with a sandbox (https://sandbox.zohoapis.com).
+    if api_domain and not configured:
         set_env_value(env_path, "ZOHO_API_DOMAIN", api_domain)
+        configured = api_domain
     print(f"OK  refresh token saved to {env_path} ({mask(body['refresh_token'])})")
-    print(f"    api_domain: {api_domain}")
-    print("    Next: python scripts/zoho_auth.py test")
+    print(f"    API domain used: {configured or DEFAULT_API_DOMAIN}"
+          + (f"  (Zoho reported {api_domain}; kept the configured one)"
+             if api_domain and configured and api_domain != configured else ""))
+    print(f"    Next: python scripts/zoho_auth.py test --env {env_path}")
     return 0
 
 

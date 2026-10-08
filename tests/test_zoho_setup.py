@@ -190,3 +190,17 @@ def test_env_option_works_before_or_after_the_command(tmp_path, monkeypatch):
     assert zoho_auth.main(["--env", env, "exchange-code", "--code", "x"]) == 0
     assert zoho_auth.main(["exchange-code", "--code", "x"]) == 0
     assert seen == [env, env, ".env"]
+
+
+def test_exchange_keeps_configured_sandbox_domain(tmp_path, capsys):
+    path = _env(tmp_path, "ZOHO_API_DOMAIN=https://sandbox.zohoapis.com\n")
+    zoho_auth.cmd_exchange(Args(env=str(path), code="1000.goodcode"), http=FakeZoho().http())
+    assert read_env(path)["ZOHO_API_DOMAIN"] == "https://sandbox.zohoapis.com"
+    assert "kept the configured one" in capsys.readouterr().out
+
+
+def test_exchange_sets_domain_when_missing(tmp_path, monkeypatch):
+    monkeypatch.delenv("ZOHO_API_DOMAIN", raising=False)
+    path = _env(tmp_path)
+    zoho_auth.cmd_exchange(Args(env=str(path), code="1000.goodcode"), http=FakeZoho().http())
+    assert read_env(path)["ZOHO_API_DOMAIN"] == "https://www.zohoapis.com"
