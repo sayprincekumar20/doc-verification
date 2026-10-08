@@ -178,3 +178,21 @@ def test_command_refuses_production(tmp_path, capsys):
     env.write_text(env.read_text(encoding="utf-8").replace("sandbox.zohoapis", "www.zohoapis"),
                    encoding="utf-8")
     assert tool.main([str(folder), "--env", str(env), "--apply"]) == 2
+
+
+def test_multiline_fields_keep_one_item_per_line_and_short_file_names():
+    a = winner_like()
+    a["requirements"][0]["file"] = "attachment_5906238000061698185_IMG_20260113_092805.jpg"
+    for p in a["proposals"]:
+        for src in p.get("sources") or []:
+            src["document"] = "attachment_5906238000061698187_IMG_20260113_092731.jpg"
+    r = build_record(a, ACCOUNT_ID)
+    reasons = r["Recommendation_Reasons"].split("\n")
+    assert len(reasons) == len(a["reasons"]) + 1          # + Customer_Status line
+    docs = r["Required_Documents"].split("\n")
+    assert len(docs) == len(a["requirements"])
+    assert docs[0].endswith("- IMG_20260113_092805.jpg") and "attachment_" not in docs[0]
+    owner = next(x for x in r["Proposed_Changes"] if x["Zoho_Field"] == "Owner_Name")
+    assert "attachment_" not in owner["Evidence"]
+    first = owner["Evidence"].split("\n")[0]
+    assert first == "DTI_BN_CERT IMG_20260113_092731.jpg: JUAN DELA CRUZ (EXACT 0.95)"

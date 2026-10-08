@@ -3,6 +3,7 @@ assessment. API names default to the ones Zoho generated in the sandbox
 (scripts/check_zoho_setup.py saves them to zoho/review_module_api_names.json, which overrides)."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -56,28 +57,44 @@ def load_names(path: Path = NAMES_FILE) -> dict:
     return DEFAULT_NAMES
 
 
-def _text(value: Any, limit: int = 255) -> str | None:
+_FETCH_PREFIX = re.compile(r"\b(?:attachment|file_field|note_attachment)_\d+_")
+
+
+def short_name(name: str | None) -> str:
+    """'attachment_5906238000061698185_IMG_20260113_092805.jpg' -> 'IMG_20260113_092805.jpg'."""
+    return _FETCH_PREFIX.sub("", name or "")
+
+
+def _text(value: Any, limit: int = 255, multiline: bool = False) -> str | None:
+    """Zoho text value. Multi-line fields keep one item per line; single-line fields are
+    collapsed. Long values are cut with an ellipsis."""
     if value in (None, "", []):
         return None
     s = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
-    s = " ".join(s.split())
+    s = short_name(s)
+    if multiline:
+        s = "\n".join(" ".join(line.split()) for line in s.splitlines() if line.strip())
+    else:
+        s = " ".join(s.split())
     return s if len(s) <= limit else s[: limit - 1] + "…"
 
 
 def _evidence(p: dict) -> str | None:
-    parts = []
+    """One line per source document: 'DTI_BN_CERT IMG_..731.jpg: MARICHELLE FLORES (EXACT
+    0.95)', then the reason."""
+    lines = []
     for src in p.get("sources") or []:
-        bits = [src.get("type") or "", src.get("document") or ""]
-        line = " ".join(b for b in bits if b)
+        line = " ".join(b for b in (src.get("type"), short_name(src.get("document"))) if b)
         if src.get("value"):
             line += f": {src['value']}"
-        if src.get("grounding") or src.get("confidence") is not None:
-            line += f" ({src.get('grounding') or ''} {src.get('confidence') or ''})".replace(
-                "( ", "(").replace(" )", ")")
-        parts.append(line)
+        check = " ".join(str(x) for x in (src.get("grounding"), src.get("confidence"))
+                         if x not in (None, ""))
+        if check:
+            line += f" ({check})"
+        lines.append(line)
     if p.get("reason"):
-        parts.append(p["reason"])
-    return _text("\n".join(parts), 2000) if parts else None
+        lines.append(p["reason"])
+    return _text("\n".join(lines), 2000, multiline=True) if lines else None
 
 
 def review_status(assessment: dict) -> str:
@@ -127,21 +144,21 @@ def build_record(assessment: dict, account_id: str, *, job_id: str | None = None
         f["Account"]: {"id": account_id},
         f["Review Status"]: review_status(assessment),
         f["Recommendation"]: assessment["recommendation"],
-        f["Recommendation Reasons"]: _text("\n".join(reasons), 2000),
+        f["Recommendation Reasons"]: _text("\n".join(reasons), 2000, multiline=True),
         f["Alerts"]: _text("\n".join(f"[{a['severity']}] {a['message']}"
                                      + (f" -> {a['action']}" if a.get("action") else "")
-                                     for a in alerts), 2000),
+                                     for a in alerts), 2000, multiline=True),
         f["Required Documents"]: _text("\n".join(
             f"{r['document_type']}: {r['status']}"
             + (f" (until {r['valid_until']})" if r.get("valid_until") else "")
-            + (f" - {r['file']}" if r.get("file") else "")
-            for r in assessment["requirements"]), 2000),
+            + (f" - {short_name(r['file'])}" if r.get("file") else "")
+            for r in assessment["requirements"]), 2000, multiline=True),
         f["Documents Found"]: len(assessment.get("documents") or []),
         f["Lowest Confidence"]: min(confidences) if confidences else None,
         f["Job ID"]: _text(job_id),
         f["Rules Version"]: assessment.get("rules_version"),
         f["Requested By"]: _text(requested_by),
-        f["Request Reason"]: _text(request_reason, 2000),
+        f["Request Reason"]: _text(request_reason, 2000, multiline=True),
         f["Proposed Changes"]: rows,
     }
     return {k: v for k, v in record.items() if v not in (None, "")}
