@@ -40,3 +40,14 @@ def test_try_extraction_without_provider_reads_and_classifies(tmp_path, capsys):
     rc = try_extraction.main([str(tmp_path / "doc.pdf"), "--env", str(tmp_path / ".env")])
     out = capsys.readouterr().out
     assert rc == 0 and "classified: DTI_BN_CERT" in out and "reading + classification only" in out
+
+
+def test_unreadable_page_is_reported_not_as_missing_provider(tmp_path, monkeypatch, capsys):
+    from PIL import Image
+    (tmp_path / "blank.png").write_bytes(sd.to_bytes(Image.new("RGB", (1200, 1600), "white")))
+    monkeypatch.setattr(try_extraction, "build_provider",
+                        lambda *a, **k: FakeVision({}, "OTHER"))
+    try_extraction.main([str(tmp_path), "--env", str(tmp_path / "none.env")])
+    out = capsys.readouterr().out
+    assert "UNREADABLE: no readable page, not sent to the AI" in out
+    assert "no AI provider configured" not in out

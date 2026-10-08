@@ -64,8 +64,13 @@ def run_file(path: Path, provider, today: date) -> dict:
                       "ocr_conf": p.quality.ocr_conf, "rotation": p.prepared.rotation,
                       "reasons": p.quality.reasons} for p in pages]}
     readable = [p for p in pages if p.quality.label != "UNREADABLE"]
-    if provider is None or not readable:
+    if provider is None:
         return out
+    if not readable:
+        reasons = sorted({r for p in pages for r in p.quality.reasons})
+        return {**out, "status": "UNREADABLE",
+                "error": "no readable page, not sent to the AI"
+                         + (f" ({', '.join(reasons)})" if reasons else "")}
     try:
         r = extract_document([PageInput(_jpeg(p.prepared.color), p.grounding_text,
                                         p.quality.label) for p in readable],
@@ -83,7 +88,7 @@ def print_result(r: dict) -> None:
     print(f"\n=== {r['file']}")
     if r["status"] in ("REJECTED", "UNREADABLE", "EXTRACTION_FAILED"):
         print(f"    {r['status']}: {r['error']}")
-        if r["status"] != "EXTRACTION_FAILED":
+        if "pages" not in r:
             return
     pages = ", ".join(f"p{p['page']} {p['quality']} ({p['ocr_conf']:.0f}%)" for p in r["pages"])
     print(f"    classified: {r['classified_as']}   pages: {pages}")
