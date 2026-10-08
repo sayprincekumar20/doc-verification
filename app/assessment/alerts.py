@@ -95,11 +95,21 @@ def status_decision(assessment: dict, current_status: str | None, threshold: flo
     if blocked:
         return "NO_CHANGE", "Unresolved document conflicts on: " + ", ".join(blocked)
     facts = assessment.get("facts", {})
-    for attribute in ("owner_name", "tin"):
+    # Identity to confirm: the owner for sole proprietors, the registered (corporate) name for
+    # corporations/partnerships, which have no owner on their documents.
+    corporate = assessment.get("business_form") in ("CORPORATION", "PARTNERSHIP")
+    identity = "registered_name" if corporate else "owner_name"
+    zoho_field = {"owner_name": "Owner_Name", "registered_name": "Invoice_Company_Name",
+                  "tin": "Tax_Identification_Number_TIN"}
+    matched_in_zoho = {p["zoho_field"] for p in assessment["proposals"] if p["action"] == "MATCH"}
+    for attribute in (identity, "tin"):
         best = max((f.get("confidence") or 0 for f in facts.get(attribute, [])), default=0)
-        if best < threshold:
-            return "NO_CHANGE", (f"{attribute} not confirmed with confidence >= {threshold} "
-                                 f"(best {best}); a person must check before activating.")
+        if not facts.get(attribute):
+            return "NO_CHANGE", f"No {attribute} found on the documents; a person must check."
+        # Confirmed by OCR (confidence) or by Zoho already holding the same value.
+        if best < threshold and zoho_field[attribute] not in matched_in_zoho:
+            return "NO_CHANGE", (f"{attribute} not confirmed (confidence {best} < {threshold} "
+                                 "and Zoho has no matching value); a person must check.")
     if is_active:
         return "ALREADY_ACTIVE", "Documents complete and valid; account already Active."
     return "ACTIVATE", "All required documents present, valid and consistent; owner and TIN " \

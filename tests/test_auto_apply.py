@@ -227,3 +227,23 @@ def test_shadow_mode_records_alert_without_zoho_calls(db, settings):
     assert fake.notes_created == [] and fake.tasks_created == []
     alert = db.query(AccountAlert).one()
     assert (alert.note_status, alert.task_status) == ("SHADOW", "SHADOW")
+
+
+def test_corporation_activates_on_registered_name_and_zoho_confirmed_tin():
+    from app.assessment.alerts import status_decision
+    a = assessment(recommendation="ACTIVE", requirements=VALID_REQS, facts={
+        "registered_name": [{"confidence": 0.95}], "tin": [{"confidence": 0.45}]})
+    a["business_form"] = "CORPORATION"
+    a["proposals"] = [{"zoho_field": "Tax_Identification_Number_TIN", "action": "MATCH"}]
+    assert status_decision(a, "Inactive", 0.95)[0] == "ACTIVATE"
+    a["proposals"] = []  # TIN neither OCR-confirmed nor matching Zoho
+    decision = status_decision(a, "Inactive", 0.95)
+    assert decision[0] == "NO_CHANGE" and "tin not confirmed" in decision[1]
+
+
+def test_sole_proprietor_without_owner_on_documents_is_not_activated():
+    from app.assessment.alerts import status_decision
+    a = assessment(recommendation="ACTIVE", requirements=VALID_REQS,
+                   facts={"tin": [{"confidence": 0.95}]})
+    decision = status_decision(a, "Inactive", 0.95)
+    assert decision[0] == "NO_CHANGE" and "No owner_name" in decision[1]
