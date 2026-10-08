@@ -47,8 +47,14 @@ def print_assessment(a: dict) -> None:
     for p in a["proposals"]:
         flag = "  needs attention" if p["needs_attention"] else ""
         conf = f" [{p['confidence']}]" if p["confidence"] is not None else ""
+        if p["action"] in ("MATCH", "DIFFERS") or p["proposed_value"] is None:
+            change = f"{str(p['current_value'])!s:.40}  (not changed)"
+        elif p["action"] == "ATTACH":
+            change = f"attach {p['proposed_value']}"
+        else:
+            change = f"{str(p['current_value'])!s:.30} -> {str(p['proposed_value'])!s:.45}"
         print(f"  {_ICONS.get(p['action'], ' ')} {p['action']:17} {p['zoho_field']:30} "
-              f"{str(p['current_value'])!s:.30} -> {str(p['proposed_value'])!s:.45}{conf}{flag}")
+              f"{change}{conf}{flag}")
         if p["action"] in ("CORRECT", "HOLD", "DIFFERS", "REVIEW_CONFLICT", "NO_PICKLIST_VALUE"):
             print(f"  {'':19} {p['reason']}")
     for d in a.get("not_extracted", []):

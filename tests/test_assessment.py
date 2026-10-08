@@ -165,3 +165,12 @@ def test_critical_document_issue_forces_review():
     b = bir()
     b.issues = [{"code": "BRANCH_MISMATCH", "message": "x", "severity": "CRITICAL"}]
     assert assess(SNAPSHOT, [b, dti(), permit()], TODAY)["recommendation"] == "MANUAL_REVIEW"
+
+
+def test_match_with_zoho_never_needs_attention():
+    low = bir()
+    low.fields["tin"] = f("123-456-789-00000", grounding="NOT_FOUND", confidence=0.45)
+    a = assess({**SNAPSHOT, "Tax_Identification_Number_TIN": "123-456-789-00000"},
+               [low, dti(), permit()], TODAY)
+    p = by_field(a)["Tax_Identification_Number_TIN"]
+    assert p["action"] == "MATCH" and p["needs_attention"] is False

@@ -171,12 +171,14 @@ def _compare_field(zoho_field: str, current: Any, chosen: Fact | None, proposed:
         return _proposal(zoho_field, current, proposed, "FILL", conf, sources,
                          "Zoho is empty; value found on documents.", **extra)
     verdict = matcher(str(current), proposed)
-    if verdict == SAME:
-        return _proposal(zoho_field, current, current, "MATCH", conf, sources,
-                         "Zoho matches the documents.", **extra)
-    if verdict == LIKELY_SAME:
-        return _proposal(zoho_field, current, current, "MATCH", conf, sources,
-                         "Zoho matches the documents (minor wording difference).", **extra)
+    if verdict in (SAME, LIKELY_SAME):
+        # Zoho and the document are independent sources; agreement confirms the value even
+        # when OCR could not (low document confidence), so nothing needs a person's attention.
+        p = _proposal(zoho_field, current, current, "MATCH", conf, sources,
+                      "Zoho matches the documents." if verdict == SAME else
+                      "Zoho matches the documents (minor wording difference).", **extra)
+        p["needs_attention"] = False
+        return p
     if not allow_correct:
         return _proposal(zoho_field, current, None, "DIFFERS", conf, sources,
                          "Zoho differs from the documents; not changed automatically. "
