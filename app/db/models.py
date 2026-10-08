@@ -233,6 +233,9 @@ class JobAssessment(Base):
     rules_version: Mapped[str] = mapped_column(String(40))
     recommendation: Mapped[str] = mapped_column(String(20))   # ACTIVE | INACTIVE | MANUAL_REVIEW
     assessment: Mapped[dict] = mapped_column(JSON)
+    # Phase 3: the "Document Verifications" record created in Zoho for human review
+    zoho_review_id: Mapped[str | None] = mapped_column(String(32))
+    review_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

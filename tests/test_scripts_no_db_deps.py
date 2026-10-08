@@ -19,6 +19,7 @@ class Block:
 sys.meta_path.insert(0, Block())
 import app.tools.zoho_auth, app.tools.fetch_account
 import app.tools.check_zoho_setup, app.tools.create_zoho_review_module
+import app.tools.create_review_record
 print('ok')
 """
 

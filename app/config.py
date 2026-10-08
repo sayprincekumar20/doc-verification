@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     alert_tasks: bool = True
     alert_task_due_days: int = 3
     alert_repeat_after_days: int = 7           # same issues -> no new task within this window
+    # Phase 3: create a "Document Verifications" review record in Zoho for every assessed job
+    create_review_records: bool = False
+    review_max_images: int = 10
 
     sentry_dsn: str | None = None
 

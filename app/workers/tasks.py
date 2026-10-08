@@ -12,6 +12,7 @@ from app.pipeline.auto_apply import auto_apply_job
 from app.pipeline.collect import collect_job
 from app.pipeline.extract import extract_job, extraction_version, manila_today
 from app.pipeline.read import read_job
+from app.pipeline.review_record import create_review_record
 from app.services.audit import record_event
 from app.storage.base import build_storage
 from app.workers.celery_app import celery_app
@@ -113,6 +114,9 @@ def extract_documents(self, job_id: str) -> str:
                                alert_tasks=s.alert_tasks,
                                task_due_days=s.alert_task_due_days,
                                repeat_after_days=s.alert_repeat_after_days)
+            if s.create_review_records:
+                create_review_record(db, job, get_zoho_client(), build_storage(s),
+                                     s.review_max_images)  # Phase 3
             return job.status
     except TransientExtractionError as exc:
         if self.request.retries < 5:

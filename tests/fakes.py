@@ -44,6 +44,9 @@ class FakeZoho:
         self.update_error: dict | None = None
         self.notes_created: list[dict] = []
         self.tasks_created: list[dict] = []
+        self.records_created: list[dict] = []
+        self.attachments_uploaded: list[tuple[str, str, int]] = []
+        self.record_error: dict | None = None
 
     @classmethod
     def from_real_responses(cls) -> "FakeZoho":
@@ -94,6 +97,19 @@ class FakeZoho:
             self.notes_created.append(json.loads(request.content)["data"][0])
             return httpx.Response(201, json={"data": [{"code": "SUCCESS", "details": {
                 "id": f"note{len(self.notes_created)}"}}]})
+        if request.method == "POST" and path == f"{base}/Document_Verifications":
+            if self.record_error:
+                return httpx.Response(400, json={"data": [self.record_error]})
+            self.records_created.append(json.loads(request.content)["data"][0])
+            return httpx.Response(201, json={"data": [{"code": "SUCCESS", "details": {
+                "id": f"dv{len(self.records_created)}"}}]})
+        if request.method == "POST" and path.startswith(f"{base}/Document_Verifications/") \
+                and path.endswith("/Attachments"):
+            body = request.content
+            name = body.split(b'filename="')[1].split(b'"')[0].decode()
+            self.attachments_uploaded.append((path.split("/")[-2], name, len(body)))
+            return httpx.Response(200, json={"data": [{"code": "SUCCESS", "details": {
+                "id": f"att{len(self.attachments_uploaded)}"}}]})
         if request.method == "POST" and path == f"{base}/Tasks":
             self.tasks_created.append(json.loads(request.content)["data"][0])
             return httpx.Response(201, json={"data": [{"code": "SUCCESS", "details": {

@@ -68,7 +68,7 @@ class ZohoClient:
         return min(2**attempt + random.uniform(0, 1), 60.0)
 
     def _request(self, method: str, path: str, params: dict | None = None,
-                 json: dict | None = None) -> httpx.Response:
+                 json: dict | None = None, files: dict | None = None) -> httpx.Response:
         url = f"{self._base}{path}"
         refreshed = False
         last_error = ""
@@ -76,7 +76,7 @@ class ZohoClient:
             headers = {"Authorization": f"Zoho-oauthtoken {self._tokens.get_token(refreshed)}"}
             try:
                 resp = self._http.request(method, url, params=params, json=json,
-                                          headers=headers)
+                                          files=files, headers=headers)
             except httpx.TransportError as exc:
                 last_error = f"network error: {exc}"
                 self._sleep(self._backoff(attempt, None))
@@ -183,6 +183,21 @@ class ZohoClient:
 
     def _create(self, path: str, record: dict[str, Any]) -> str:
         resp = self._request("POST", path, json={"data": [record]})
+        result = (resp.json().get("data") or [{}])[0]
+        if result.get("code") != "SUCCESS":
+            raise ZohoAPIError(resp.status_code, str(result))
+        return str((result.get("details") or {}).get("id", ""))
+
+    def create_record(self, module: str, record: dict[str, Any]) -> str:
+        """POST /{module}; returns the new record id (custom modules: scope
+        ZohoCRM.modules.custom.CREATE)."""
+        return self._create(f"/{module}", record)
+
+    def upload_attachment(self, module: str, record_id: str, file_name: str, data: bytes,
+                          content_type: str = "application/octet-stream") -> str:
+        """POST /{module}/{id}/Attachments (multipart). Scope ZohoCRM.modules.attachments.CREATE."""
+        resp = self._request("POST", f"/{module}/{record_id}/Attachments",
+                             files={"file": (file_name, data, content_type)})
         result = (resp.json().get("data") or [{}])[0]
         if result.get("code") != "SUCCESS":
             raise ZohoAPIError(resp.status_code, str(result))

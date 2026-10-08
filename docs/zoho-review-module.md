@@ -122,3 +122,22 @@ generated are saved to `zoho/review_module_api_names.json`.
 Blueprint on Review Status (Start Review -> Approve / Reject / Request Documents; Approve requires a
 Decision on every row and **Values Compared** ticked), a "Verification Reviewer" profile, then
 Canvas for the record page and a widget for the image-beside-table view.
+
+## Engine -> review records (Phase 3)
+
+With `CREATE_REVIEW_RECORDS=true` the worker creates one **Document Verifications** record per
+assessed job: summary fields, alerts, reasons, required documents, one **Proposed Changes** row per
+proposal (rows that need a decision first, with `Decision = Pending`; MATCH rows for context;
+automatically applied rows marked `Auto Applied = Applied`) and the cleaned page images as
+attachments. Review Status: `Pending Review` if anything needs a decision, else
+`Waiting for Documents` if documents are missing/expired, else `Applied`.
+
+Scopes needed: `ZohoCRM.modules.custom.CREATE` (+ `.READ`, `.UPDATE` for the review flow) and
+`ZohoCRM.modules.attachments.CREATE` (all in `python scripts/zoho_auth.py scopes`).
+
+Try it in the sandbox from an offline assessment:
+
+```cmd
+python scripts/create_review_record.py samples/<account_id> --account-id <sandbox Account id>
+python scripts/create_review_record.py samples/<account_id> --account-id <sandbox Account id> --apply
+```
