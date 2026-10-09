@@ -141,3 +141,26 @@ Try it in the sandbox from an offline assessment:
 python scripts/create_review_record.py samples/<account_id> --account-id <sandbox Account id>
 python scripts/create_review_record.py samples/<account_id> --account-id <sandbox Account id> --apply
 ```
+
+## Blueprint "Document Verification Review" (Review Status)
+
+Pending Review -(Start Review: Reviewer mandatory)-> In Review
+In Review -(Approve: Values Compared mandatory, Reviewer Notes)-> Approved
+In Review -(Reject: Reviewer Notes mandatory)-> Rejected
+In Review / Pending Review -(Request Documents: Reviewer Notes mandatory)-> Waiting for Documents
+
+## Write-back after approval
+
+```cmd
+python scripts/apply_reviews.py --env .env.sandbox            # dry run
+python scripts/apply_reviews.py --env .env.sandbox --apply
+```
+
+Finds records with Review Status = Approved and, for each, writes only rows with Decision
+**Approve** or **Edit** (the reviewer's edited Proposed Value) to the Account, for Owner_Name,
+TIN, Type of Business Organization, Business Style, Invoice Company Name, Billing Street,
+Account Name. The Account is re-read first: a field that changed since the review was created is
+skipped (Conflict). Each row's Auto Applied shows Applied / Skipped / Failed, Reviewer Notes gets
+a write-back summary, Reviewed Time is set, and Review Status becomes Applied, Conflict or
+Failed. File rows (ATTACH) are not automated yet. Later the hosted engine runs this
+automatically from the Approve transition.

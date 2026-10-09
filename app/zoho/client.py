@@ -228,6 +228,10 @@ class ZohoClient:
             raise ZohoNotFoundError("Current user not returned")
         return users[0]
 
+    def search_records(self, module: str, criteria: str) -> list[dict[str, Any]]:
+        """GET /{module}/search?criteria=(Field:equals:Value) - all pages."""
+        return list(self._paginate(f"/{module}/search", {"criteria": criteria}))
+
     def list_profiles(self) -> list[dict[str, Any]]:
         return self._get_json("/settings/profiles").get("profiles") or []
 

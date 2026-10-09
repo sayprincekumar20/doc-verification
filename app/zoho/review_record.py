@@ -18,6 +18,8 @@ DEFAULT_NAMES = {
         "Documents Found": "Documents_Found", "Lowest Confidence": "Lowest_Confidence",
         "Job ID": "Job_ID", "Rules Version": "Rules_Version", "Requested By": "Requested_By",
         "Request Reason": "Request_Reason", "Proposed Changes": "Proposed_Changes",
+        "Reviewer": "Reviewer", "Reviewed Time": "Reviewed_Time",
+        "Reviewer Notes": "Reviewer_Notes", "Values Compared": "Values_Compared",
     },
     "subform_fields": {
         "Zoho Field": "Zoho_Field", "Field Label": "Field_Label",
