@@ -26,7 +26,7 @@ DEFAULT_SNAPSHOT_FIELDS = [
     "Billing_Province", "Billing_State", "Billing_Code", "Billing_Country",
     "Shipping_Street", "Shipping_Barangay", "Shipping_City", "Shipping_Province",
     "Shipping_State", "Shipping_Code",
-    "Email", "Phone", "Phone_Number", "Contact_Number",
+    "Email", "Phone", "Phone_Number", "Contact_Number", "Contact_Person", "Employees",
     "Delivery_Permit", "Special_Permit",
     "BIR_Registration_COR", "Business_registration", "Business_Permit",
     "General_Information_Sheet",

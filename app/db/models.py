@@ -211,6 +211,7 @@ class DocumentExtraction(Base):
     model_type: Mapped[str | None] = mapped_column(String(32))
     document_type: Mapped[str | None] = mapped_column(String(32))
     fields: Mapped[dict | None] = mapped_column(JSON)      # name -> value/normalized/grounding/...
+    other_fields: Mapped[list | None] = mapped_column(JSON)  # every other labelled item
     issues: Mapped[list | None] = mapped_column(JSON)
     validity_status: Mapped[str | None] = mapped_column(String(16))
     valid_until: Mapped[str | None] = mapped_column(String(10))

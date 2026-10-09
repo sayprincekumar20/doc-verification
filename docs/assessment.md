@@ -18,6 +18,26 @@ ignored; a left-out middle name is LIKELY_SAME; possessives/legal suffixes ignor
 names; address abbreviations (BLK, LT, BRGY, ST, PH...) and filler words (CITY, OF, PHILIPPINES...)
 normalized; one address containing the other is SAME; **any changed number is DIFFERENT**.
 
+## Customer Information Sheet and other data
+
+- RGF's own **Customer Information Sheet** (.xlsx) is read directly from its cells (no OCR, no
+  AI): TIN, company name, trade name, addresses, contact person and position, email, phone
+  (leading 0 restored), receivers, etc. It is self-declared, so it confirms documents (e.g. TIN)
+  but never outranks the BIR 2303 / DTI / permit. Its contact person counts as the owner only if
+  the position says Owner.
+- The AI also returns **every other labelled item** on a document (`other_fields`): telephone,
+  email, BIN, eOR No., employees... Emails and phone numbers are used as contact facts.
+- `document_data` in the assessment (and `extracted_data.json` from `assess_account.py`) holds
+  everything read from every file, next to the Zoho values.
+- Contact proposals: **Email, Phone, Contact_Person** - fill only (an existing Zoho value is
+  shown as DIFFERS, never overwritten). Different emails/phones across sources are normal
+  (status DIFFERS, INFO).
+
+Other rules from real customers: a business name differing by a misread letter or two (>= 90%
+similar, same numbers) is LIKELY_CONSISTENT; a Mayor's permit without a printed expiry is valid
+to Dec 31 of its permit/issue year (VALIDITY_DERIVED); a required document whose validity is
+UNKNOWN blocks ACTIVE.
+
 ## 2. Proposals for Zoho
 
 | Action | Meaning |

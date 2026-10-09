@@ -1,6 +1,7 @@
 """Comparisons between documents and Zoho, tuned on real Philippine documents."""
 
 import re
+from difflib import SequenceMatcher
 
 from app.extraction.normalize import alnum, business_key, normalize_name, numbers_conflict
 
@@ -81,6 +82,10 @@ def match_business(a: str | None, b: str | None) -> str | None:
         return SAME
     if alnum(ka) in alnum(kb) or alnum(kb) in alnum(ka):
         return LIKELY_SAME  # "WALDS BISTRO" vs "WALDS BISTRO AND STEAKHOUSE"
+    # A letter or two misread ("NISHIKEN" vs "NISHIKIKEN GENERAL MERCHANDISE"): likely the same
+    # business. Numbers must still agree.
+    if not numbers_conflict(ka, kb) and SequenceMatcher(None, alnum(ka), alnum(kb)).ratio() >= 0.9:
+        return LIKELY_SAME
     return DIFFERENT
 
 

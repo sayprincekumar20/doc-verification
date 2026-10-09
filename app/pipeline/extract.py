@@ -14,6 +14,7 @@ from app.db.models import (
     FilePage,
     FileReading,
     JobStatus,
+    StoredFile,
     VerificationJob,
 )
 from app.extraction.extract import PageInput, extract_document
@@ -23,6 +24,8 @@ from app.extraction.providers import (
     TransientExtractionError,
     VisionProvider,
 )
+from app.extraction.spreadsheet import DOCUMENT_TYPE as CIS_TYPE
+from app.extraction.spreadsheet import extract_customer_info_sheet
 from app.pipeline.read import PIPELINE_VERSION
 from app.services.audit import record_event
 from app.storage.base import Storage
@@ -54,6 +57,19 @@ def extract_file(db: Session, storage: Storage, sha256: str, provider: VisionPro
         db.flush()
         return row
 
+    if reading.document_type == CIS_TYPE:
+        stored = db.get(StoredFile, sha256)
+        sheet = extract_customer_info_sheet(storage.get(stored.storage_key))
+        row.status, row.error = "EXTRACTED", None
+        row.expected_type = row.model_type = row.document_type = CIS_TYPE
+        row.fields, row.other_fields = sheet["fields"], sheet["other_fields"]
+        row.issues, row.validity_status, row.valid_until = [], "NO_EXPIRY", None
+        row.model, row.calls, row.seconds = "spreadsheet-cells", 0, 0.0
+        row.input_tokens = row.output_tokens = 0
+        row = db.merge(row)
+        db.flush()
+        return row
+
     pages = db.scalars(select(FilePage).where(
         FilePage.sha256 == sha256, FilePage.pipeline_version == PIPELINE_VERSION)
         .order_by(FilePage.page_number)).all()
@@ -74,6 +90,7 @@ def extract_file(db: Session, storage: Storage, sha256: str, provider: VisionPro
     row.expected_type, row.model_type = result.expected_type, result.model_type
     row.document_type = result.document_type
     row.fields = {k: asdict(v) for k, v in result.fields.items()}
+    row.other_fields = result.other_fields
     row.issues = result.issues
     row.validity_status, row.valid_until = result.validity_status, result.valid_until
     row.model, row.calls, row.seconds = result.model, result.calls, result.seconds

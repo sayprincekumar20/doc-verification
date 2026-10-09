@@ -128,4 +128,6 @@ def normalize(kind: str, value: str | None) -> str | None:
         return re.sub(r"\s+", " ", strip_code_label(value).upper()).strip()
     if kind == "choice":
         return normalize_name(value)
+    if kind == "email":
+        return str(value).strip().lower()
     return normalize_name(value) if kind in ("name", "address", "text") else str(value).strip()

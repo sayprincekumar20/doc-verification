@@ -21,7 +21,7 @@ from app.zoho.review_record import load_names
 
 WRITABLE_FIELDS = {"Owner_Name", "Tax_Identification_Number_TIN",
                    "Type_of_Business_Organization", "Business_Style", "Invoice_Company_Name",
-                   "Billing_Street", "Account_Name"}
+                   "Billing_Street", "Account_Name", "Email", "Phone", "Contact_Person"}
 APPROVED = {"Approve", "Edit"}
 
 

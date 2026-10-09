@@ -3,7 +3,7 @@ whenever wording or fields change, so cached results are recomputed."""
 
 from app.extraction.fields import FieldSpec
 
-EXTRACTION_PROMPT_VERSION = "ph-docs-3"
+EXTRACTION_PROMPT_VERSION = "ph-docs-4"
 
 DOCUMENT_TYPES = ["BIR_2303", "DTI_BN_CERT", "MAYORS_PERMIT", "SEC_CERT", "GIS",
                   "BARANGAY_CLEARANCE", "GOVERNMENT_ID", "FOOD_SAFETY_PERMIT", "OTHER"]
@@ -24,6 +24,10 @@ Rules:
 - Ignore date/time stamps added by the camera (e.g. "2026.10.03 09:20" in a photo corner) and
   phone model watermarks; they are not part of the document.
 - If the same page appears more than once, read the clearest copy.
+- In other_fields, list every OTHER labelled item printed on the document that is not already
+  one of the fields (e.g. telephone, email, BIN, eOR No., number of employees, area, barangay
+  no., kind of business): label and value exactly as printed. Skip terms, conditions and
+  instructions.
 - "evidence" is the short printed text where you read the value (label + value), max 120 chars.
 - "page" is the 1-based page number where the value appears.
 - Report what the document actually is in document_type, even if it differs from the expected type.
@@ -54,9 +58,19 @@ def output_schema(specs: list[FieldSpec]) -> dict:
                 "required": [s.name for s in specs],
                 "additionalProperties": False,
             },
+            "other_fields": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"label": {"type": "string"}, "value": {"type": "string"},
+                                   "page": {"type": ["integer", "null"]}},
+                    "required": ["label", "value", "page"],
+                    "additionalProperties": False,
+                },
+            },
             "legibility_notes": {"type": ["string", "null"]},
         },
-        "required": ["document_type", "fields", "legibility_notes"],
+        "required": ["document_type", "fields", "other_fields", "legibility_notes"],
         "additionalProperties": False,
     }
 

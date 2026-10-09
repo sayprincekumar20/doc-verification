@@ -59,10 +59,23 @@ def check_validity(document_type: str, normalized: dict, today: date) -> Validit
 
     if document_type == "MAYORS_PERMIT":
         end = _d(normalized, "valid_until")
-        year = normalized.get("permit_year")
-        if end is None and year and str(year).isdigit():
-            end = date(int(year), 12, 31)  # permits run to Dec 31 of their year
-        return _status(_d(normalized, "date_issued"), end, today, [])
+        issues = []
+        if end is None:
+            # Permits run to Dec 31 of their year. Some (e.g. Manila e-permits) only say so in
+            # the terms, so use the permit year, else the year it was issued or paid.
+            year = normalized.get("permit_year")
+            source = "permit year"
+            if not (year and str(year).isdigit()):
+                for name in ("date_issued", "date_paid"):
+                    if d := _d(normalized, name):
+                        year, source = d.year, name.replace("_", " ")
+                        break
+            if year and str(year).isdigit():
+                end = date(int(year), 12, 31)
+                issues.append(Issue("VALIDITY_DERIVED", f"No expiry printed; valid until "
+                                    f"{end.isoformat()} (Dec 31 of the {source})",
+                                    "valid_until", "INFO"))
+        return _status(_d(normalized, "date_issued"), end, today, issues)
 
     if document_type == "GOVERNMENT_ID":
         end = _d(normalized, "expiry_date")

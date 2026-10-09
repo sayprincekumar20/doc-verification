@@ -38,6 +38,22 @@ def _name_ext(file_name: str | None) -> str | None:
     return _ALIASES.get(ext, ext) or None
 
 
+def _office_type_in_zip(data: bytes) -> str | None:
+    """Excel/Word files written by some tools are detected as plain zip; look inside."""
+    import io
+    import zipfile
+
+    try:
+        names = zipfile.ZipFile(io.BytesIO(data)).namelist()
+    except zipfile.BadZipFile:
+        return None
+    if any(n.startswith("xl/") for n in names):
+        return "xlsx"
+    if any(n.startswith("word/") for n in names):
+        return "docx"
+    return None
+
+
 def check_file(data: bytes, file_name: str | None, max_bytes: int) -> FileCheck:
     if not data:
         return FileCheck(False, reason="File is empty")
@@ -48,6 +64,8 @@ def check_file(data: bytes, file_name: str | None, max_bytes: int) -> FileCheck:
     detected = _ALIASES.get(kind.extension, kind.extension) if kind else None
     name_ext = _name_ext(file_name)
 
+    if detected == "zip":
+        detected = _office_type_in_zip(data) or detected
     if detected in ALLOWED:
         return FileCheck(True, detected, ALLOWED[detected])
     # Old binary Office formats (doc/xls) share an OLE container that filetype can't tell apart.

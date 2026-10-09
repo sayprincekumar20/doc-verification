@@ -31,7 +31,8 @@ def assess_job(db: Session, job: VerificationJob, extraction_version: str,
             continue
         inputs.append(DocInput(str(doc.id), doc.file_name or doc.zoho_file_ref,
                                row.document_type or "OTHER", row.fields or {},
-                               row.validity_status, row.valid_until, row.issues or []))
+                               row.validity_status, row.valid_until, row.issues or [],
+                               row.other_fields or []))
     result = assess(job.account_snapshot or {}, inputs, today)
     result["not_extracted"] = not_extracted
     result["skipped_documents"] = [

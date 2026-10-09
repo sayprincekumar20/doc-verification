@@ -104,7 +104,8 @@ def main(argv: list[str] | None = None) -> int:
             print_result(r)
         if r["status"] == "EXTRACTED":
             inputs.append(DocInput(str(i), r["file"], r["document_type"], r["fields"],
-                                   r["validity"], r["valid_until"], r["issues"]))
+                                   r["validity"], r["valid_until"], r["issues"],
+                                   r.get("other_fields") or []))
     a = assess(snapshot, inputs, today)
     a["not_extracted"] = [{"file": r["file"], "status": r["status"], "error": r.get("error")}
                           for r in results if r["status"] != "EXTRACTED"]
@@ -134,7 +135,13 @@ def main(argv: list[str] | None = None) -> int:
     out = args.folder / "assessment.json"
     out.write_text(json.dumps({"assessment": a, "documents": results}, indent=2,
                               ensure_ascii=False), encoding="utf-8")
-    print(f"\nSaved {out}")
+    data_file = args.folder / "extracted_data.json"
+    data_file.write_text(json.dumps({"account": {"id": account.get("id"),
+                                                 "name": account.get("Account_Name")},
+                                     "zoho": snapshot, "documents": a["document_data"]},
+                                    indent=2, ensure_ascii=False, default=str),
+                         encoding="utf-8")
+    print(f"\nSaved {out} and {data_file} (all data read from every file)")
     return 0
 
 

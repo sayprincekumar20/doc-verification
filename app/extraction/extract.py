@@ -66,6 +66,7 @@ class ExtractionResult:
     output_tokens: int
     seconds: float
     calls: int
+    other_fields: list[dict] = field(default_factory=list)  # every other labelled item
 
 
 def prepare_image(jpeg: bytes) -> bytes:
@@ -193,7 +194,12 @@ def extract_document(pages: list[PageInput], expected_type: str, provider: Visio
     if notes := out.data.get("legibility_notes"):
         issues.append(Issue("LEGIBILITY_NOTE", str(notes)[:300], None, "INFO"))
 
+    other = [{"label": str(o.get("label", "")).strip()[:120],
+              "value": str(o.get("value", "")).strip()[:500], "page": o.get("page")}
+             for o in (out.data.get("other_fields") or [])[:80]
+             if isinstance(o, dict) and o.get("label") and o.get("value")]
     return ExtractionResult(
+        other_fields=other,
         expected_type=expected_type, model_type=model_type, document_type=doc_type,
         fields=results, issues=[i.as_dict() for i in issues],
         validity_status=validity.status, valid_until=validity.valid_until, model=out.model,

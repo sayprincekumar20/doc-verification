@@ -23,6 +23,7 @@ import cv2
 
 from app.extraction.extract import PageInput, extract_document
 from app.extraction.providers import ExtractionError, build_provider
+from app.extraction.spreadsheet import extract_customer_info_sheet, is_customer_info_sheet
 from app.pipeline.file_checks import check_file
 from app.reading.classify import classify_text
 from app.reading.normalize import UnreadableFileError
@@ -53,6 +54,13 @@ def run_file(path: Path, provider, today: date) -> dict:
     check = check_file(data, path.name, 100 * 1024 * 1024)
     if not check.ok:
         return {"file": path.name, "status": "REJECTED", "error": check.reason}
+    if check.extension == "xlsx" and is_customer_info_sheet(data):
+        sheet = extract_customer_info_sheet(data)
+        return {"file": path.name, "status": "EXTRACTED", "classified_as": sheet["document_type"],
+                "pages": [], "document_type": sheet["document_type"],
+                "model_type": "spreadsheet-cells", "validity": "NO_EXPIRY", "valid_until": None,
+                "issues": [], "fields": sheet["fields"], "other_fields": sheet["other_fields"],
+                "tokens": {"input": 0, "output": 0, "calls": 0}}
     try:
         pages = read_document(data, check.mime_type)
     except UnreadableFileError as exc:
@@ -81,6 +89,7 @@ def run_file(path: Path, provider, today: date) -> dict:
             "model_type": r.model_type, "validity": r.validity_status,
             "valid_until": r.valid_until, "issues": r.issues,
             "fields": {k: asdict(v) for k, v in r.fields.items()},
+            "other_fields": r.other_fields,
             "tokens": {"input": r.input_tokens, "output": r.output_tokens, "calls": r.calls}}
 
 
@@ -91,7 +100,7 @@ def print_result(r: dict) -> None:
         if "pages" not in r:
             return
     pages = ", ".join(f"p{p['page']} {p['quality']} ({p['ocr_conf']:.0f}%)" for p in r["pages"])
-    print(f"    classified: {r['classified_as']}   pages: {pages}")
+    print(f"    classified: {r['classified_as']}   pages: {pages or 'read from spreadsheet cells'}")
     if r["status"] != "EXTRACTED":
         if r["status"] == "READ":
             print("    (no AI provider configured: reading + classification only)")
@@ -106,6 +115,9 @@ def print_result(r: dict) -> None:
                                                                    f["value"]) else ""
         print(f"      {name:22} {f['value']!s:45.45}{norm}  [{f['grounding']} "
               f"{f['confidence']}]")
+    if r.get("other_fields"):
+        print("    other items: " + "; ".join(f"{o['label']}: {o['value']}"
+                                             for o in r["other_fields"])[:400])
     for i in r["issues"]:
         if i["severity"] != "INFO":
             print(f"    ! {i['severity']:8} {i['code']}: {i['message']}")

@@ -21,6 +21,8 @@ from app.db.models import (
     StoredFile,
     VerificationJob,
 )
+from app.extraction.spreadsheet import DOCUMENT_TYPE as CIS_TYPE
+from app.extraction.spreadsheet import is_customer_info_sheet
 from app.reading.classify import classify_text
 from app.reading.normalize import UnreadableFileError
 from app.reading.pipeline import read_document
@@ -45,8 +47,17 @@ def read_file(db: Session, storage: Storage, stored: StoredFile, file_name: str 
         return existing  # already read this exact content
 
     started = time.monotonic()
+    data = storage.get(stored.storage_key)
+    if stored.extension == "xlsx" and is_customer_info_sheet(data):
+        # RGF Customer Information Sheet: read from its cells at extraction, no OCR.
+        reading = FileReading(sha256=stored.sha256, pipeline_version=version, status="READ",
+                              page_count=0, document_type=CIS_TYPE, type_confidence=1.0,
+                              seconds=round(time.monotonic() - started, 2))
+        db.add(reading)
+        db.flush()
+        return reading
     try:
-        pages = read_document(storage.get(stored.storage_key), stored.mime_type)
+        pages = read_document(data, stored.mime_type)
     except UnreadableFileError as exc:
         reading = FileReading(sha256=stored.sha256, pipeline_version=version,
                               status="UNREADABLE", error=str(exc), page_count=0)
