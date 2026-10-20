@@ -87,8 +87,10 @@ def collect_job(
     job.status = JobStatus.COLLECTING
     db.commit()
 
-    # GET /crm/v8/Accounts/{account_id}
-    account = client.get_record(MODULE, job.account_id)
+    sent = job.button_data or {}
+    # The button already read the Account (and its Attachments / Notes) in Zoho: use that
+    # instead of calling Zoho again. Otherwise: GET /crm/v8/Accounts/{account_id}
+    account = sent.get("account") or client.get_record(MODULE, job.account_id)
     job.account_snapshot = build_snapshot(account, settings.zoho_snapshot_fields)
     zoho_number = account.get("Inventory_Customer_Number")
     if job.customer_number and zoho_number and job.customer_number != zoho_number:
@@ -102,7 +104,17 @@ def collect_job(
                   "modified_time": account.get("Modified_Time")})
 
     # GET .../Attachments, fileupload fields, GET .../Notes ($attachments)
-    refs = discover_sources(client, job.account_id, account, settings)
+    notes = sent.get("notes")
+    if notes is not None and notes and not any("$attachments" in n for n in notes):
+        notes = None  # this Deluge version doesn't return note attachments: read them here
+    refs = discover_sources(client, job.account_id, account, settings,
+                            attachments=sent.get("attachments"), notes=notes)
+    saved = [k for k in ("account", "attachments") if sent.get(k) is not None] + (
+        ["notes"] if notes is not None else [])
+    if saved:
+        record_event(db, "BUTTON_DATA_USED", f"Used data sent by the button: {', '.join(saved)}"
+                     f" ({len(saved)} Zoho API call(s) saved)", job.id)
+    job.button_data = None  # not needed after collection
     _check_button_report(job, refs)
     counts: dict[str, int] = {}
     for r in refs:

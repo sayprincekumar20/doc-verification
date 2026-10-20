@@ -36,6 +36,9 @@ def create_or_get_active_job(db: Session, req: JobCreate) -> tuple[VerificationJ
         requested_by_user_id=who.id if who else None,
         requested_by_email=who.email if who else None,
         requested_at=req.requested_at,
+        button_data={k: v for k, v in (("account", req.account),
+                                       ("attachments", req.attachments),
+                                       ("notes", req.notes)) if v is not None} or None,
     )
     db.add(job)
     try:
@@ -48,6 +51,10 @@ def create_or_get_active_job(db: Session, req: JobCreate) -> tuple[VerificationJ
             return existing, False
         raise
     record_event(db, "JOB_CREATED", "Verification requested", job.id,
-                 req.model_dump(mode="json", exclude={"account_id"}))
+                 req.model_dump(mode="json",
+                                exclude={"account_id", "account", "attachments", "notes"})
+                 | {"sent_by_button": sorted(k for k, v in (("account", req.account),
+                                                            ("attachments", req.attachments),
+                                                            ("notes", req.notes)) if v)})
     db.commit()
     return job, True

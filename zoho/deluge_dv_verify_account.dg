@@ -1,0 +1,100 @@
+// Standalone function: dv_verify_account
+//   Setup > Developer Hub > Functions > + New Function
+//   Function name: dv_verify_account     Category: Standalone
+//   Arguments: account_id (String), reason (String), user_id (String), user_email (String)
+// Org variables (Setup > Developer Hub > Variables):
+//   dv_engine_url      e.g. https://dv.yourcompany.com   (no trailing slash)
+//   dv_engine_api_key  the engine's API_KEY
+//
+// One click = one engine request. The function reads the Account, its Attachments and Notes
+// ONCE, checks that at least one document exists (no documents -> message, engine not called),
+// then sends everything to the engine, which then only downloads the files.
+string standalone.dv_verify_account(String account_id, String reason, String user_id, String user_email)
+{
+	acc_id = account_id.toLong();
+	rec = zoho.crm.getRecordById("Accounts", acc_id);
+	if (rec == null || rec.get("id") == null)
+	{
+		return {"ok": false, "message": "Account not found."}.toString();
+	}
+	attachments = zoho.crm.getRelatedRecords("Attachments", "Accounts", acc_id);
+	if (attachments == null)
+	{
+		attachments = List();
+	}
+	notes = zoho.crm.getRelatedRecords("Notes", "Accounts", acc_id);
+	if (notes == null)
+	{
+		notes = List();
+	}
+
+	// ---- 1. Any document on this Account? ----
+	count = attachments.size();
+	for each fld in {"BIR_Registration_COR", "Business_registration", "Business_Permit", "General_Information_Sheet"}
+	{
+		val = rec.get(fld);
+		if (val != null && val.size() > 0)
+		{
+			count = count + val.size();
+		}
+	}
+	for each n in notes
+	{
+		note_files = n.get("$attachments");
+		if (note_files != null && note_files.size() > 0)
+		{
+			count = count + note_files.size();
+		}
+	}
+	if (count == 0)
+	{
+		return {"ok": false, "message": "No documents found on this Account. Please attach the BIR 2303, DTI or SEC certificate and Mayor's / Business Permit, then click Verify Account again."}.toString();
+	}
+
+	// ---- 2. One request to the engine with everything it needs ----
+	requested_by = Map();
+	requested_by.put("id", ifnull(user_id, ""));
+	requested_by.put("email", ifnull(user_email, ""));
+
+	payload = Map();
+	payload.put("account_id", account_id);
+	payload.put("customer_number", ifnull(rec.get("Inventory_Customer_Number"), ""));
+	payload.put("reason", ifnull(reason, ""));
+	payload.put("document_status", "YES");
+	payload.put("attachment_count", count);
+	payload.put("requested_by", requested_by);
+	payload.put("requested_at", zoho.currenttime.toString("yyyy-MM-dd'T'HH:mm:ss") + "+08:00");
+	payload.put("source", "crm_button");
+	payload.put("account", rec);
+	payload.put("attachments", attachments);
+	payload.put("notes", notes);
+
+	resp = invokeurl
+	[
+		url: zoho.crm.getOrgVariable("dv_engine_url") + "/v1/jobs"
+		type: POST
+		parameters: payload.toString()
+		headers: {"Content-Type": "application/json", "X-API-Key": zoho.crm.getOrgVariable("dv_engine_api_key")}
+		detailed: true
+	];
+	code = resp.get("responseCode");
+	body = resp.get("responseText");
+
+	if (code == 202)
+	{
+		return {"ok": true, "message": "Verification started for " + count + " document(s). The result will appear in Document Verifications (related list below) in 1-3 minutes."}.toString();
+	}
+	if (code == 200)
+	{
+		return {"ok": true, "message": "A verification for this Account is already in progress. Please check Document Verifications in a few minutes."}.toString();
+	}
+	if (code == 401)
+	{
+		return {"ok": false, "message": "The verification engine rejected the request (API key). Please contact the CRM admin."}.toString();
+	}
+	if (code == 422)
+	{
+		return {"ok": false, "message": "The verification engine could not accept this request (" + body + "). Please contact the CRM admin."}.toString();
+	}
+	return {"ok": false, "message": "Could not reach the verification engine (code " + code + "). Please try again later or contact the CRM admin."}.toString();
+}

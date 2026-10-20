@@ -79,6 +79,9 @@ class VerificationJob(Base):
     requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Account fields as read from Zoho when the job ran (expected values for later phases).
     account_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    # Account record / Attachments / Notes sent by the button (used instead of reading Zoho
+    # again; cleared after collection)
+    button_data: Mapped[dict | None] = mapped_column(JSON)
     # Non-fatal issues, e.g. [{"code": "ATTACHMENT_COUNT_MISMATCH", "message": "..."}]
     warnings: Mapped[list | None] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(String(32), default=JobStatus.QUEUED, index=True)

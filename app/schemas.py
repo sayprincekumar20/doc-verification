@@ -43,6 +43,13 @@ class JobCreate(BaseModel):
     requested_by: RequestedBy | None = None
     requested_at: datetime | None = None
     source: Literal["crm_button", "manual", "schedule", "api"] = "crm_button"
+    # Optional data the button already read in Zoho (saves the engine 3 API calls):
+    account: dict[str, Any] | None = Field(
+        default=None, description="Account record as returned by zoho.crm.getRecordById")
+    attachments: list[dict[str, Any]] | None = Field(
+        default=None, max_length=500, description="Attachments related list of the Account")
+    notes: list[dict[str, Any]] | None = Field(
+        default=None, max_length=500, description="Notes related list (with $attachments)")
 
     @field_validator("customer_number", mode="before")
     @classmethod
@@ -68,6 +75,14 @@ class JobCreate(BaseModel):
         if v is not None and v.tzinfo is None:
             return v.replace(tzinfo=MANILA)  # CRM users are in the Philippines
         return v
+
+
+    @field_validator("account")
+    @classmethod
+    def _account_matches(cls, value, info):
+        if value is not None and str(value.get("id", "")) not in ("", info.data.get("account_id")):
+            raise ValueError("account.id does not match account_id")
+        return value
 
 
 class JobCreated(BaseModel):
