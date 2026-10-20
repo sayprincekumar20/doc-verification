@@ -24,6 +24,11 @@ evaluation tools. See `docs/reading.md`, `docs/extraction.md`, `docs/assessment.
 
 Next: Phase 2 (Verify Account button in Zoho) and Phase 3 (review module in Zoho CRM).
 
+## Deploy
+
+One server, local PostgreSQL, automatic HTTPS, no document copies kept:
+`docs/deployment.md` (`docker-compose.prod.yml`).
+
 ## Test on a customer
 
 See `docs/testing-a-customer.md`: fetch an Account's documents, run `scripts/try_extraction.py`,

@@ -11,6 +11,7 @@ class Storage(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> None: ...
     def exists(self, key: str) -> bool: ...
     def get(self, key: str) -> bytes: ...
+    def delete(self, key: str) -> None: ...
 
 
 class LocalStorage:
@@ -35,6 +36,9 @@ class LocalStorage:
 
     def get(self, key: str) -> bytes:
         return self._path(key).read_bytes()
+
+    def delete(self, key: str) -> None:
+        self._path(key).unlink(missing_ok=True)
 
 
 class S3Storage:
@@ -72,6 +76,9 @@ class S3Storage:
 
     def get(self, key: str) -> bytes:
         return self._s3.get_object(Bucket=self._bucket, Key=key)["Body"].read()
+
+    def delete(self, key: str) -> None:
+        self._s3.delete_object(Bucket=self._bucket, Key=key)
 
 
 def build_storage(settings: Settings) -> Storage:

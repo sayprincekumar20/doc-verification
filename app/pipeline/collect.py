@@ -60,8 +60,13 @@ def _check_button_report(job: VerificationJob, refs: list[SourceRef]) -> None:
 
 
 def _store_file(db: Session, storage: Storage, data: bytes, sha: str, ext: str, mime: str) -> None:
-    if db.get(StoredFile, sha) is not None:
-        return  # same content collected in an earlier job: reuse it
+    existing = db.get(StoredFile, sha)
+    if existing is not None:
+        # Same content seen before. Its copy may have been deleted after that job
+        # (KEEP_DOCUMENT_FILES=false): store it again for this job.
+        if not storage.exists(existing.storage_key):
+            storage.put(existing.storage_key, data, mime)
+        return
     key = storage_key_for(sha, ext)
     if not storage.exists(key):
         storage.put(key, data, mime)

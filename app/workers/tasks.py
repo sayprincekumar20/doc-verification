@@ -9,6 +9,7 @@ from app.extraction.providers import TransientExtractionError, build_provider
 from app.logging import setup_logging
 from app.pipeline.assess import assess_job
 from app.pipeline.auto_apply import auto_apply_job
+from app.pipeline.cleanup import purge_job_files
 from app.pipeline.collect import collect_job
 from app.pipeline.extract import extract_job, extraction_version, manila_today
 from app.pipeline.read import read_job
@@ -23,6 +24,20 @@ log = logging.getLogger(__name__)
 MAX_RETRIES = 5
 
 
+def _cleanup(job_id: uuid.UUID) -> None:
+    """End of a job: delete document copies unless KEEP_DOCUMENT_FILES=true."""
+    settings = get_settings()
+    if settings.keep_document_files:
+        return
+    try:
+        with session_scope() as db:
+            job = db.get(VerificationJob, job_id)
+            if job is not None:
+                purge_job_files(db, job, build_storage(settings))
+    except Exception:  # noqa: BLE001 - cleanup must never fail the job
+        log.exception("Deleting document copies failed", extra={"job_id": str(job_id)})
+
+
 def _fail(job_id: uuid.UUID, message: str) -> None:
     with session_scope() as db:
         job = db.get(VerificationJob, job_id)
@@ -30,6 +45,7 @@ def _fail(job_id: uuid.UUID, message: str) -> None:
             job.status, job.error = JobStatus.FAILED, message
             job.completed_at = datetime.now(UTC)
             record_event(db, "JOB_FAILED", message, job.id)
+    _cleanup(job_id)
 
 
 @celery_app.task(bind=True, name="collect_documents", max_retries=MAX_RETRIES)
@@ -79,6 +95,7 @@ def read_documents(job_id: str) -> str:
                 db.get(VerificationJob, jid).status = JobStatus.EXTRACTING
             extract_documents.delay(job_id)  # Phase 1C
             return JobStatus.EXTRACTING
+        _cleanup(jid)  # extraction disabled: the job ends here
         return status
     except Exception as exc:
         log.exception("Reading crashed", extra={"job_id": job_id})
@@ -117,7 +134,9 @@ def extract_documents(self, job_id: str) -> str:
             if s.create_review_records:
                 create_review_record(db, job, get_zoho_client(), build_storage(s),
                                      s.review_max_images)  # Phase 3
-            return job.status
+            status = job.status
+        _cleanup(jid)  # page images are in the review record; delete local copies
+        return status
     except TransientExtractionError as exc:
         if self.request.retries < 5:
             raise self.retry(exc=exc, countdown=min(60 * 2**self.request.retries, 1800)) from exc

@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     s3_secret_access_key: SecretStr | None = None
 
     max_file_bytes: int = 25 * 1024 * 1024
+    # false = no document copies kept: after each job the downloaded files, page images and
+    # page OCR text are deleted; only fingerprints and verification results remain (Zoho keeps
+    # the documents). Re-checks download again from Zoho and reuse cached AI results by hash.
+    keep_document_files: bool = False
 
     # Phase 1C: vision-model extraction. "none" stops jobs after reading.
     extraction_provider: str = "none"          # anthropic | openai | none

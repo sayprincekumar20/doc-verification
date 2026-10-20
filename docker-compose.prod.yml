@@ -1,0 +1,71 @@
+# One-server production setup (no Supabase): engine API + worker + Redis + PostgreSQL + Caddy
+# (automatic HTTPS). Documents are NOT kept: KEEP_DOCUMENT_FILES=false deletes the downloaded
+# files and page images after each job; the database holds results and the audit trail only.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Needs in .env: DOMAIN, POSTGRES_PASSWORD, DATABASE_URL (pointing at "postgres"), API_KEY,
+# ZOHO_*, EXTRACTION_*. See docs/deployment.md.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dv
+      POSTGRES_DB: dv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dv"]
+      interval: 10s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  migrate:
+    build: .
+    env_file: .env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build: .
+    env_file: .env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+    volumes: ["files:/data/files"]
+    expose: ["8000"]          # not published: only Caddy (HTTPS) reaches it
+    restart: unless-stopped
+
+  worker:
+    build: .
+    env_file: .env
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=INFO",
+              "--concurrency=2", "-Q", "verification"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+    volumes: ["files:/data/files"]   # temporary working copies only
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. dv.yourcompany.com}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  files:
+  caddy_data:
+  caddy_config:
