@@ -1,6 +1,12 @@
 string standalone.dv_verify_account(String account_id, String reason, String user_id, String user_email)
 {
 	result = Map();
+	if(ifnull(account_id,"") == "")
+	{
+		result.put("ok",false);
+		result.put("message","Function received: account_id=[" + ifnull(account_id,"") + "] reason=[" + ifnull(reason,"") + "] user_id=[" + ifnull(user_id,"") + "] user_email=[" + ifnull(user_email,"") + "]");
+		return result.toString();
+	}
 	acc_id = account_id.toLong();
 	rec = zoho.crm.getRecordById("Accounts",acc_id);
 	if(rec.get("id") == null)
