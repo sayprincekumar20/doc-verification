@@ -7,12 +7,36 @@
 var accountId = $Page.record_id;
 
 function outputOf(resp) {
-  // Functions.execute wraps the Deluge return value in details.output (a JSON string).
-  try {
-    return JSON.parse(resp.details.output);
-  } catch (e) {
-    return { ok: false, message: "Unexpected response from dv_verify_account. Please contact the CRM admin." };
+  // Read the Deluge return value, whatever shape Functions.execute returns it in.
+  var candidates = [];
+  if (resp && resp.details) {
+    candidates.push(resp.details.output, resp.details.userMessage, resp.details.output_string);
   }
+  if (resp) {
+    candidates.push(resp.output, resp.result, resp.data, resp);
+  }
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    if (c === undefined || c === null || c === "") { continue; }
+    if (typeof c === "object" && c.message) { return c; }
+    if (typeof c === "string") {
+      try {
+        var parsed = JSON.parse(c);
+        if (parsed && parsed.message) { return parsed; }
+        if (typeof parsed === "string") {           // returned as a JSON string inside a string
+          var inner = JSON.parse(parsed);
+          if (inner && inner.message) { return inner; }
+        }
+      } catch (e) {
+        if (c.indexOf("message") === -1) { return { ok: true, message: c }; }
+      }
+    }
+  }
+  // Unknown shape: show it, so it can be fixed.
+  var raw = "";
+  try { raw = JSON.stringify(resp); } catch (e) { raw = String(resp); }
+  console.log("dv_verify_account raw response:", raw);
+  return { ok: false, message: "Unexpected response from dv_verify_account: " + raw.substring(0, 400) };
 }
 
 var input = ZDK.Client.getInput(
