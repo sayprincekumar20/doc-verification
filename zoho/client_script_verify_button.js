@@ -61,23 +61,38 @@ if (!accountId) {
     userEmail = "";   // not essential: the verification still runs
   }
 
-  var result;
+  var args = {
+    account_id: String(accountId),
+    reason: reason,
+    user_id: String($Crm.user.id),
+    user_email: userEmail
+  };
+  // How Zoho passes arguments to a REST-enabled function from a Client Script is not clearly
+  // documented: try the known formats in order; a wrong one returns "No account id received"
+  // at once (no job started). The alert says which format worked.
+  var formats = [
+    { name: "object", payload: args },
+    { name: "arguments-json", payload: { arguments: JSON.stringify(args) } },
+    { name: "json-text", payload: JSON.stringify(args) },
+    { name: "arguments-json-text", payload: JSON.stringify({ arguments: JSON.stringify(args) }) }
+  ];
+  var result = { ok: false, message: "No response." };
+  var used = "";
   ZDK.Client.showLoader({ type: "page", message: "Checking documents and starting verification..." });
   try {
-    // Functions called through their REST API (OAuth 2.0) take all arguments as JSON text
-    // in one "arguments" field; passing them directly arrives empty.
-    result = outputOf(ZDK.Apps.CRM.Functions.execute("dv_verify_account", {
-      arguments: JSON.stringify({
-        account_id: String(accountId),
-        reason: reason,
-        user_id: String($Crm.user.id),
-        user_email: userEmail
-      })
-    }));
+    for (var f = 0; f < formats.length; f++) {
+      result = outputOf(ZDK.Apps.CRM.Functions.execute("dv_verify_account", formats[f].payload));
+      used = formats[f].name;
+      var msg = String(result.message || "");
+      if (msg.indexOf("No account id received") === -1 && msg.indexOf("Function received") === -1) {
+        break;   // the function got the account id with this format
+      }
+    }
   } catch (e) {
     result = { ok: false, message: "Could not start the verification: " + (e && e.message ? e.message : e) };
   } finally {
-    ZDK.Client.hideLoader();   // always close the loader, even after an error
+    ZDK.Client.hideLoader();
   }
+  result.message = result.message + "  [format: " + used + "]";
   ZDK.Client.showAlert(result.message);
 }
