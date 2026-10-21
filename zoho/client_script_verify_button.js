@@ -1,8 +1,8 @@
 // Zoho CRM > Setup > Customization > Modules and Fields > Accounts > Buttons > + New Button
 //   Name: Verify Account   Placement: Detail page (In Record)   Action: Client Script
-// Paste this script. It asks for an optional reason, then calls the Deluge function
-// dv_verify_account ONCE: that function checks for documents and sends the Account,
-// Attachments and Notes to the verification engine in a single request.
+// Asks for an optional reason, then calls the Deluge function dv_verify_account ONCE:
+// it checks for documents and sends the Account, Attachments and Notes to the engine.
+// Needs REST API > OAuth 2.0 switched on for dv_verify_account.
 
 var accountId = $Page.record_id;
 
@@ -23,7 +23,7 @@ function outputOf(resp) {
       try {
         var parsed = JSON.parse(c);
         if (parsed && parsed.message) { return parsed; }
-        if (typeof parsed === "string") {           // returned as a JSON string inside a string
+        if (typeof parsed === "string") {
           var inner = JSON.parse(parsed);
           if (inner && inner.message) { return inner; }
         }
@@ -32,7 +32,6 @@ function outputOf(resp) {
       }
     }
   }
-  // Unknown shape: show it, so it can be fixed.
   var raw = "";
   try { raw = JSON.stringify(resp); } catch (e) { raw = String(resp); }
   console.log("dv_verify_account raw response:", raw);
@@ -46,15 +45,28 @@ var input = ZDK.Client.getInput(
 
 if (input !== false && input !== undefined && input !== null) {
   var reason = (input && input[0]) ? String(input[0]).trim() : "";
-  var user = ZDK.Apps.CRM.Users.fetchById($Crm.user.id);
 
+  var userEmail = "";
+  try {
+    var user = ZDK.Apps.CRM.Users.fetchById($Crm.user.id);
+    userEmail = (user && user.email) ? user.email : "";
+  } catch (e) {
+    userEmail = "";   // not essential: the verification still runs
+  }
+
+  var result;
   ZDK.Client.showLoader({ type: "page", message: "Checking documents and starting verification..." });
-  var result = outputOf(ZDK.Apps.CRM.Functions.execute("dv_verify_account", {
-    account_id: String(accountId),
-    reason: reason,
-    user_id: String($Crm.user.id),
-    user_email: user ? user.email : ""
-  }));
-  ZDK.Client.hideLoader();
+  try {
+    result = outputOf(ZDK.Apps.CRM.Functions.execute("dv_verify_account", {
+      account_id: String(accountId),
+      reason: reason,
+      user_id: String($Crm.user.id),
+      user_email: userEmail
+    }));
+  } catch (e) {
+    result = { ok: false, message: "Could not start the verification: " + (e && e.message ? e.message : e) };
+  } finally {
+    ZDK.Client.hideLoader();   // always close the loader, even after an error
+  }
   ZDK.Client.showAlert(result.message);
 }
