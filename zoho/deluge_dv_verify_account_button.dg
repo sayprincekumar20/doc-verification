@@ -1,6 +1,87 @@
 string button.dv_verify_account_button(String account_id)
 {
-	out = standalone.dv_verify_account(account_id,"","",zoho.loginuser);
-	answer = out.toMap();
-	return answer.get("message");
+	acc_id = account_id.toLong();
+	rec = zoho.crm.getRecordById("Accounts",acc_id);
+	if(rec.get("id") == null)
+	{
+		return "Account not found.";
+	}
+	attachments = zoho.crm.getRelatedRecords("Attachments","Accounts",acc_id);
+	if(attachments == null)
+	{
+		attachments = List();
+	}
+	notes = zoho.crm.getRelatedRecords("Notes","Accounts",acc_id);
+	if(notes == null)
+	{
+		notes = List();
+	}
+	count = attachments.size();
+	file_fields = List();
+	file_fields.add("BIR_Registration_COR");
+	file_fields.add("Business_registration");
+	file_fields.add("Business_Permit");
+	file_fields.add("General_Information_Sheet");
+	for each  fld in file_fields
+	{
+		val = rec.get(fld);
+		if(val != null)
+		{
+			count = count + val.size();
+		}
+	}
+	for each  n in notes
+	{
+		note_files = n.get("$attachments");
+		if(note_files != null)
+		{
+			count = count + note_files.size();
+		}
+	}
+	if(count == 0)
+	{
+		return "No documents found on this Account. Please attach the BIR 2303, DTI or SEC certificate and Mayors / Business Permit, then click Verify Account again.";
+	}
+	requested_by = Map();
+	requested_by.put("id","");
+	requested_by.put("email",zoho.loginuser);
+	now_text = zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss").replaceAll(" ","T") + "+08:00";
+	payload = Map();
+	payload.put("account_id",account_id);
+	payload.put("customer_number",ifnull(rec.get("Inventory_Customer_Number"),""));
+	payload.put("reason","");
+	payload.put("document_status","YES");
+	payload.put("attachment_count",count);
+	payload.put("requested_by",requested_by);
+	payload.put("requested_at",now_text);
+	payload.put("source","crm_button");
+	payload.put("account",rec);
+	payload.put("attachments",attachments);
+	payload.put("notes",notes);
+	engine_url = zoho.crm.getOrgVariable("dv_engine_url") + "/v1/jobs";
+	request_headers = Map();
+	request_headers.put("Content-Type","application/json");
+	request_headers.put("X-API-Key",zoho.crm.getOrgVariable("dv_engine_api_key"));
+	resp = invokeurl
+	[
+		url :engine_url
+		type :POST
+		parameters:payload.toString()
+		headers:request_headers
+	];
+	resp_text = resp.toString();
+	if(resp_text.contains("job_id"))
+	{
+		answer = resp_text.toMap();
+		if(answer.get("created") == true)
+		{
+			return "Verification started for " + count + " document(s). The result will appear in Document Verifications (related list below) in 1-3 minutes.";
+		}
+		return "A verification for this Account is already in progress. Please check Document Verifications in a few minutes.";
+	}
+	if(resp_text.contains("Invalid API key"))
+	{
+		return "The verification engine rejected the request (API key). Please contact the CRM admin.";
+	}
+	return "The verification engine did not start the check: " + resp_text.left(300);
 }
