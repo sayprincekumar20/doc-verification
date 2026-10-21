@@ -52,6 +52,15 @@ services:
     volumes: ["files:/data/files"]   # temporary working copies only
     restart: unless-stopped
 
+  poller:
+    build: .
+    env_file: .env
+    command: ["python", "-m", "app.tools.poll_requests"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+    restart: unless-stopped
+
   caddy:
     image: caddy:2
     environment:

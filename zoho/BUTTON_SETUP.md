@@ -1,3 +1,24 @@
+# "Verify Account" button - PULL MODE (recommended: no public address needed)
+
+The button only marks the Account; the engine (local Docker or a server) asks Zoho every
+POLL_INTERVAL_SECONDS (60) for marked Accounts, starts their jobs, clears the mark, and writes
+the Document Verifications record back. Zoho never calls the engine, so nothing can be blocked
+and the engine can run behind any office router.
+
+1. **Account fields** (Setup > Modules and Fields > Accounts > Standard layout; can stay hidden
+   from the layout): `DV Requested` (Checkbox), `DV Request Reason` (Multi Line),
+   `DV Requested By` (Single Line), `DV Requested At` (Date/Time). Check the API names are
+   `DV_Requested`, `DV_Request_Reason`, `DV_Requested_By`, `DV_Requested_At`.
+2. **Button**: Accounts > Buttons > Create: name Verify Account, action **Function**, In Record,
+   Detail (Standard), Write your own: `dv_request_verification`, argument `account_id` =
+   Accounts - Account Id; paste `zoho/deluge_dv_request_verification.dg`; Save; Associate.
+3. **Engine**: `docker compose up -d --build` starts api, worker **and poller**. Watch:
+   `docker compose logs -f poller worker`. The token needs Accounts READ + UPDATE (already).
+
+---
+
+# Push mode (Zoho calls the engine) - needs a public, trusted engine address
+
 # "Verify Account" button (Phase 2) - setup and sandbox test
 
 Click flow: **Verify Account** (Accounts detail page) -> optional reason -> Deluge

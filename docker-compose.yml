@@ -23,6 +23,15 @@ services:
     volumes: ["files:/data/files"]
     restart: unless-stopped
 
+  poller:
+    build: .
+    env_file: ${ENGINE_ENV_FILE:-.env}
+    command: ["python", "-m", "app.tools.poll_requests"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+    restart: unless-stopped
+
   migrate:
     build: .
     env_file: ${ENGINE_ENV_FILE:-.env}

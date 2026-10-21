@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     # the documents). Re-checks download again from Zoho and reuse cached AI results by hash.
     keep_document_files: bool = False
 
+    # Pull mode: the Verify Account button only marks the Account in Zoho; the engine polls for
+    # marked Accounts (no inbound connection to the engine needed: works behind any router).
+    poll_interval_seconds: int = 60
+    request_flag_field: str = "DV_Requested"            # Checkbox on Accounts
+    request_reason_field: str = "DV_Request_Reason"     # Multi-line
+    request_by_field: str = "DV_Requested_By"           # Single line (email)
+    request_at_field: str = "DV_Requested_At"           # Date/Time
+
     # Phase 1C: vision-model extraction. "none" stops jobs after reading.
     extraction_provider: str = "none"          # anthropic | openai | none
     extraction_model: str | None = None        # default for anthropic: claude-sonnet-5-5

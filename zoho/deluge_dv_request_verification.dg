@@ -1,0 +1,61 @@
+string button.dv_request_verification(String account_id)
+{
+	acc_id = account_id.toLong();
+	rec = zoho.crm.getRecordById("Accounts",acc_id);
+	if(rec.get("id") == null)
+	{
+		return "Account not found.";
+	}
+	attachments = zoho.crm.getRelatedRecords("Attachments","Accounts",acc_id);
+	if(attachments == null)
+	{
+		attachments = List();
+	}
+	notes = zoho.crm.getRelatedRecords("Notes","Accounts",acc_id);
+	if(notes == null)
+	{
+		notes = List();
+	}
+	count = attachments.size();
+	file_fields = List();
+	file_fields.add("BIR_Registration_COR");
+	file_fields.add("Business_registration");
+	file_fields.add("Business_Permit");
+	file_fields.add("General_Information_Sheet");
+	for each  fld in file_fields
+	{
+		val = rec.get(fld);
+		if(val != null)
+		{
+			count = count + val.size();
+		}
+	}
+	for each  n in notes
+	{
+		note_files = n.get("$attachments");
+		if(note_files != null)
+		{
+			count = count + note_files.size();
+		}
+	}
+	if(count == 0)
+	{
+		return "No documents found on this Account. Please attach the BIR 2303, DTI or SEC certificate and Mayors / Business Permit, then click Verify Account again.";
+	}
+	if(rec.get("DV_Requested") == true)
+	{
+		return "A verification for this Account is already requested. The result will appear in Document Verifications shortly.";
+	}
+	now_text = zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss").replaceAll(" ","T") + "+08:00";
+	mark = Map();
+	mark.put("DV_Requested",true);
+	mark.put("DV_Requested_By",zoho.loginuser);
+	mark.put("DV_Requested_At",now_text);
+	mark.put("DV_Request_Reason","");
+	upd = zoho.crm.updateRecord("Accounts",acc_id,mark);
+	if(upd.get("id") == null)
+	{
+		return "Could not request the verification: " + upd.toString();
+	}
+	return "Verification requested for " + count + " document(s). The engine starts within about a minute; the result will appear in Document Verifications (related list below) in 2-4 minutes.";
+}
