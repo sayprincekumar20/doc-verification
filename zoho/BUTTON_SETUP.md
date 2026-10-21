@@ -35,6 +35,12 @@ proposals and page images.
 
 ## 2. Zoho sandbox setup
 
+0. **Connection** (Setup > Developer Hub > Connections > Custom Services > Create Service):
+   service `DV Engine`, Authentication Type **API Key**, Parameter Type **Header**,
+   Parameter Key `X-API-Key`, Display Name `API Key`. Then create a connection from it:
+   link name `dv_engine`, API Key = the engine's `API_KEY`. The function calls the engine with
+   `connection:"dv_engine"` (the key is no longer in the code or an org variable).
+
 1. **Org variables** (Setup > Developer Hub > Variables > Create):
    - `dv_engine_url` = the https address (no trailing `/`)
    - `dv_engine_api_key` = the engine's `API_KEY`

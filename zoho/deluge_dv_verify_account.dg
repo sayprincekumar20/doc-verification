@@ -109,13 +109,13 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 	engine_url = zoho.crm.getOrgVariable("dv_engine_url") + "/v1/jobs";
 	request_headers = Map();
 	request_headers.put("Content-Type","application/json");
-	request_headers.put("X-API-Key",zoho.crm.getOrgVariable("dv_engine_api_key"));
 	resp = invokeurl
 	[
 		url :engine_url
 		type :POST
 		parameters:payload.toString()
 		headers:request_headers
+		connection:"dv_engine"
 	];
 	resp_text = resp.toString();
 	if(resp_text.contains("job_id"))
