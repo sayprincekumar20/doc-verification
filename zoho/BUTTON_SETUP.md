@@ -40,7 +40,8 @@ proposals and page images.
    - `dv_engine_api_key` = the engine's `API_KEY`
 2. **Function** (Setup > Developer Hub > Functions > + New Function): name `dv_verify_account`,
    category **Standalone**; arguments `account_id`, `reason`, `user_id`, `user_email` (all String);
-   paste `zoho/deluge_dv_verify_account.dg`; Save. Test it with a sandbox Account id.
+   paste `zoho/deluge_dv_verify_account.dg` exactly as is (no comments or apostrophes: the CRM
+   editor misreads them); Save. Test it with a sandbox Account id.
 3. **Button** (Setup > Customization > Modules and Fields > Accounts > Buttons > + New Button):
    name **Verify Account**, placement **Detail page (In Record)**, action **Client Script**;
    paste `zoho/client_script_verify_button.js`; choose the profiles that may use it; Save.
