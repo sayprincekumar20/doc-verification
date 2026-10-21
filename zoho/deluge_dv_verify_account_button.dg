@@ -83,5 +83,9 @@ string button.dv_verify_account_button(String account_id)
 	{
 		return "The verification engine rejected the request (API key). Please contact the CRM admin.";
 	}
-	return "The verification engine did not start the check: " + resp_text.left(300);
+	if(resp_text.length() > 300)
+	{
+		resp_text = resp_text.subString(0,300);
+	}
+	return "The verification engine did not start the check: " + resp_text;
 }

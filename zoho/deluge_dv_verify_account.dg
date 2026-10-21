@@ -30,8 +30,18 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 	}
 	if(ifnull(account_id,"") == "")
 	{
+		params_text = ifnull(crmAPIRequest.get("params"),"").toString();
+		if(params_text.length() > 300)
+		{
+			params_text = params_text.subString(0,300);
+		}
+		body_text2 = ifnull(crmAPIRequest.get("body"),"").toString();
+		if(body_text2.length() > 300)
+		{
+			body_text2 = body_text2.subString(0,300);
+		}
 		result.put("ok",false);
-		result.put("message","No account id received. params=" + ifnull(crmAPIRequest.get("params"),"").toString().left(300) + " | body=" + ifnull(crmAPIRequest.get("body"),"").toString().left(300));
+		result.put("message","No account id received. params=" + params_text + " | body=" + body_text2);
 		return result.toString();
 	}
 	acc_id = account_id.toLong();
@@ -128,6 +138,10 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 		return result.toString();
 	}
 	result.put("ok",false);
-	result.put("message","The verification engine did not start the check: " + resp_text.left(300));
+	if(resp_text.length() > 300)
+	{
+		resp_text = resp_text.subString(0,300);
+	}
+	result.put("message","The verification engine did not start the check: " + resp_text);
 	return result.toString();
 }
