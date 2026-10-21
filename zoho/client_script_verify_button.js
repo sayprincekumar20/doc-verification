@@ -4,7 +4,12 @@
 // it checks for documents and sends the Account, Attachments and Notes to the engine.
 // Needs REST API > OAuth 2.0 switched on for dv_verify_account.
 
-var accountId = $Page.record_id;
+var accountId = "";
+try { accountId = $Page.record_id; } catch (e) {}
+if (!accountId) { try { accountId = $Page.record.id; } catch (e) {} }
+if (!accountId && typeof context !== "undefined" && context) {
+  accountId = context.record_id || (context.record && context.record.id) || "";
+}
 
 function outputOf(resp) {
   // Read the Deluge return value, whatever shape Functions.execute returns it in.
@@ -43,7 +48,9 @@ var input = ZDK.Client.getInput(
   "Verify Account Documents", "Verify", "Cancel"
 );
 
-if (input !== false && input !== undefined && input !== null) {
+if (!accountId) {
+  ZDK.Client.showAlert("Could not read this Account's id. Please reload the page and try again.");
+} else if (input !== false && input !== undefined && input !== null) {
   var reason = (input && input[0]) ? String(input[0]).trim() : "";
 
   var userEmail = "";
@@ -57,11 +64,15 @@ if (input !== false && input !== undefined && input !== null) {
   var result;
   ZDK.Client.showLoader({ type: "page", message: "Checking documents and starting verification..." });
   try {
+    // Functions called through their REST API (OAuth 2.0) take all arguments as JSON text
+    // in one "arguments" field; passing them directly arrives empty.
     result = outputOf(ZDK.Apps.CRM.Functions.execute("dv_verify_account", {
-      account_id: String(accountId),
-      reason: reason,
-      user_id: String($Crm.user.id),
-      user_email: userEmail
+      arguments: JSON.stringify({
+        account_id: String(accountId),
+        reason: reason,
+        user_id: String($Crm.user.id),
+        user_email: userEmail
+      })
     }));
   } catch (e) {
     result = { ok: false, message: "Could not start the verification: " + (e && e.message ? e.message : e) };
