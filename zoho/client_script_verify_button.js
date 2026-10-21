@@ -81,8 +81,13 @@ if (!accountId) {
   ZDK.Client.showLoader({ type: "page", message: "Checking documents and starting verification..." });
   try {
     for (var f = 0; f < formats.length; f++) {
-      result = outputOf(ZDK.Apps.CRM.Functions.execute("dv_verify_account", formats[f].payload));
       used = formats[f].name;
+      try {
+        result = outputOf(ZDK.Apps.CRM.Functions.execute("dv_verify_account", formats[f].payload));
+      } catch (err) {
+        result = { ok: false, message: "No account id received (" + used + " failed: " +
+                   (err && err.message ? err.message : err) + ")" };
+      }
       var msg = String(result.message || "");
       if (msg.indexOf("No account id received") === -1 && msg.indexOf("Function received") === -1) {
         break;   // the function got the account id with this format
