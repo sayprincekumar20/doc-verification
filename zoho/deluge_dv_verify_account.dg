@@ -1,10 +1,31 @@
-string standalone.dv_verify_account(String account_id, String reason, String user_id, String user_email)
+string standalone.dv_verify_account(String account_id, String reason, String user_id, String user_email, map crmAPIRequest)
 {
 	result = Map();
 	if(ifnull(account_id,"") == "")
 	{
+		req = ifnull(crmAPIRequest,Map());
+		params = ifnull(req.get("params"),Map());
+		args_text = params.get("arguments");
+		if(args_text != null)
+		{
+			sent = args_text.toString().toMap();
+			account_id = ifnull(sent.get("account_id"),"");
+			reason = ifnull(sent.get("reason"),"");
+			user_id = ifnull(sent.get("user_id"),"");
+			user_email = ifnull(sent.get("user_email"),"");
+		}
+		else
+		{
+			account_id = ifnull(params.get("account_id"),"");
+			reason = ifnull(params.get("reason"),"");
+			user_id = ifnull(params.get("user_id"),"");
+			user_email = ifnull(params.get("user_email"),"");
+		}
+	}
+	if(ifnull(account_id,"") == "")
+	{
 		result.put("ok",false);
-		result.put("message","Function received: account_id=[" + ifnull(account_id,"") + "] reason=[" + ifnull(reason,"") + "] user_id=[" + ifnull(user_id,"") + "] user_email=[" + ifnull(user_email,"") + "]");
+		result.put("message","No account id received. Request: " + ifnull(crmAPIRequest,"").toString().left(600));
 		return result.toString();
 	}
 	acc_id = account_id.toLong();
