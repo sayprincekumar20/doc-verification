@@ -1,16 +1,18 @@
-// Standalone function: dv_verify_account
-//   Setup > Developer Hub > Functions > + New Function
-//   Function name: dv_verify_account     Category: Standalone
-//   Arguments: account_id (String), reason (String), user_id (String), user_email (String)
-// Org variables (Setup > Developer Hub > Variables):
-//   dv_engine_url      e.g. https://dv.yourcompany.com   (no trailing slash)
-//   dv_engine_api_key  the engine's API_KEY
-//
-// One click = one engine request. The function reads the Account, its Attachments and Notes
-// ONCE, checks that at least one document exists (no documents -> message, engine not called),
-// then sends everything to the engine, which then only downloads the files.
 string standalone.dv_verify_account(String account_id, String reason, String user_id, String user_email)
 {
+	// Standalone function: dv_verify_account
+	//   Setup > Developer Hub > Functions > + New Function
+	//   Function name: dv_verify_account     Category: Standalone
+	//   Arguments: account_id (String), reason (String), user_id (String), user_email (String)
+	// Org variables (Setup > Developer Hub > Variables):
+	//   dv_engine_url      e.g. https://dv.yourcompany.com   (no trailing slash)
+	//   dv_engine_api_key  the engine's API_KEY
+	//
+	// One click = one engine request. The function reads the Account, its Attachments and Notes
+	// ONCE, checks that at least one document exists (no documents -> message, engine not called),
+	// then sends everything to the engine, which then only downloads the files.
+	//
+	// Zoho requires the code to START with the line above: paste this whole file as is.
 	acc_id = account_id.toLong();
 	rec = zoho.crm.getRecordById("Accounts", acc_id);
 	if (rec == null || rec.get("id") == null)
