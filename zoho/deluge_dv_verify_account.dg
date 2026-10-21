@@ -1,10 +1,13 @@
 string standalone.dv_verify_account(String account_id, String reason, String user_id, String user_email)
 {
+	result = Map();
 	acc_id = account_id.toLong();
 	rec = zoho.crm.getRecordById("Accounts",acc_id);
-	if(rec == null || rec.get("id") == null)
+	if(rec.get("id") == null)
 	{
-		return {"ok":false,"message":"Account not found."}.toString();
+		result.put("ok",false);
+		result.put("message","Account not found.");
+		return result.toString();
 	}
 	attachments = zoho.crm.getRelatedRecords("Attachments","Accounts",acc_id);
 	if(attachments == null)
@@ -17,11 +20,15 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 		notes = List();
 	}
 	count = attachments.size();
-	file_fields = {"BIR_Registration_COR","Business_registration","Business_Permit","General_Information_Sheet"};
+	file_fields = List();
+	file_fields.add("BIR_Registration_COR");
+	file_fields.add("Business_registration");
+	file_fields.add("Business_Permit");
+	file_fields.add("General_Information_Sheet");
 	for each  fld in file_fields
 	{
 		val = rec.get(fld);
-		if(val != null && val.size() > 0)
+		if(val != null)
 		{
 			count = count + val.size();
 		}
@@ -29,14 +36,16 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 	for each  n in notes
 	{
 		note_files = n.get("$attachments");
-		if(note_files != null && note_files.size() > 0)
+		if(note_files != null)
 		{
 			count = count + note_files.size();
 		}
 	}
 	if(count == 0)
 	{
-		return {"ok":false,"message":"No documents found on this Account. Please attach the BIR 2303, DTI or SEC certificate and Mayors / Business Permit, then click Verify Account again."}.toString();
+		result.put("ok",false);
+		result.put("message","No documents found on this Account. Please attach the BIR 2303, DTI or SEC certificate and Mayors / Business Permit, then click Verify Account again.");
+		return result.toString();
 	}
 	requested_by = Map();
 	requested_by.put("id",ifnull(user_id,""));
@@ -63,19 +72,29 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 	resp_text = ifnull(resp.get("responseText"),"").toString();
 	if(status_code == 202)
 	{
-		return {"ok":true,"message":"Verification started for " + count + " document(s). The result will appear in Document Verifications (related list below) in 1-3 minutes."}.toString();
+		result.put("ok",true);
+		result.put("message","Verification started for " + count + " document(s). The result will appear in Document Verifications (related list below) in 1-3 minutes.");
+		return result.toString();
 	}
 	if(status_code == 200)
 	{
-		return {"ok":true,"message":"A verification for this Account is already in progress. Please check Document Verifications in a few minutes."}.toString();
+		result.put("ok",true);
+		result.put("message","A verification for this Account is already in progress. Please check Document Verifications in a few minutes.");
+		return result.toString();
 	}
 	if(status_code == 401)
 	{
-		return {"ok":false,"message":"The verification engine rejected the request (API key). Please contact the CRM admin."}.toString();
+		result.put("ok",false);
+		result.put("message","The verification engine rejected the request (API key). Please contact the CRM admin.");
+		return result.toString();
 	}
 	if(status_code == 422)
 	{
-		return {"ok":false,"message":"The verification engine could not accept this request: " + resp_text.left(300)}.toString();
+		result.put("ok",false);
+		result.put("message","The verification engine could not accept this request: " + resp_text.left(300));
+		return result.toString();
 	}
-	return {"ok":false,"message":"Could not reach the verification engine (code " + status_code + "). Please try again later or contact the CRM admin."}.toString();
+	result.put("ok",false);
+	result.put("message","Could not reach the verification engine (code " + status_code + "). Please try again later or contact the CRM admin.");
+	return result.toString();
 }
