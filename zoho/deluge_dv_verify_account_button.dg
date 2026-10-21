@@ -1,0 +1,6 @@
+string button.dv_verify_account_button(String account_id)
+{
+	out = standalone.dv_verify_account(account_id,"","",zoho.loginuser);
+	answer = out.toMap();
+	return answer.get("message");
+}

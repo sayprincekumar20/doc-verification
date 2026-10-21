@@ -43,8 +43,15 @@ proposals and page images.
    paste `zoho/deluge_dv_verify_account.dg` exactly as is (no comments or apostrophes: the CRM
    editor misreads them); Save. Test it with a sandbox Account id.
 3. **Button** (Setup > Customization > Modules and Fields > Accounts > Buttons > + New Button):
-   name **Verify Account**, placement **Detail page (In Record)**, action **Client Script**;
-   paste `zoho/client_script_verify_button.js`; choose the profiles that may use it; Save.
+   name **Verify Account**, page **In Record**, position **Detail (Standard)** (add the Canvas
+   detail position too if your team uses a Canvas record page), profiles as needed.
+   - **Recommended - action Function:** create the button function `dv_verify_account_button`
+     with argument `account_id` mapped to *Accounts - Account Id*; paste
+     `zoho/deluge_dv_verify_account_button.dg`. Zoho shows the returned message. No API setting
+     needed; no "Reason" prompt.
+   - *Alternative - action Client Script* (`zoho/client_script_verify_button.js`, asks for a
+     reason): needs the function's REST API (OAuth2) enabled, otherwise Zoho answers
+     "API is inactive for the given custom function".
 
 ## 3. Test
 
