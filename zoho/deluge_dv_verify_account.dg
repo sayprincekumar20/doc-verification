@@ -78,31 +78,28 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 
 	resp = invokeurl
 	[
-		url: engine_url
-		type: POST
-		parameters: payload.toString()
-		headers: request_headers
-		detailed: true
+		url :engine_url
+		type :POST
+		parameters:payload.toString()
+		headers:request_headers
 	];
-	// ("code" is a reserved word in Deluge)
-	status_code = resp.get("responseCode");
-	response_text = resp.get("responseText");
-
-	if (status_code == 202)
+	resp_text = resp.toString();
+	if (resp_text.contains("job_id"))
 	{
-		return {"ok": true, "message": "Verification started for " + count + " document(s). The result will appear in Document Verifications (related list below) in 1-3 minutes."}.toString();
-	}
-	if (status_code == 200)
-	{
+		result = resp_text.toMap();
+		if (result.get("created") == true)
+		{
+			return {"ok": true, "message": "Verification started for " + count + " document(s). The result will appear in Document Verifications (related list below) in 1-3 minutes."}.toString();
+		}
 		return {"ok": true, "message": "A verification for this Account is already in progress. Please check Document Verifications in a few minutes."}.toString();
 	}
-	if (status_code == 401)
+	if (resp_text.contains("API key"))
 	{
 		return {"ok": false, "message": "The verification engine rejected the request (API key). Please contact the CRM admin."}.toString();
 	}
-	if (status_code == 422)
+	if (resp_text.contains("detail"))
 	{
-		return {"ok": false, "message": "The verification engine could not accept this request (" + response_text + "). Please contact the CRM admin."}.toString();
+		return {"ok": false, "message": "The verification engine could not accept this request: " + resp_text.left(300) + ". Please contact the CRM admin."}.toString();
 	}
-	return {"ok": false, "message": "Could not reach the verification engine (code " + status_code + "). Please try again later or contact the CRM admin."}.toString();
+	return {"ok": false, "message": "Could not reach the verification engine. Please try again later or contact the CRM admin."}.toString();
 }
