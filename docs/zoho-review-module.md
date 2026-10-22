@@ -172,3 +172,13 @@ every `REVIEW_APPLY_INTERVAL_SECONDS` (120) for records with Review Status = **A
 applies them exactly like `scripts/apply_reviews.py --apply`; results go to the audit trail and,
 for engine jobs, to `field_updates`. Turn off with `APPLY_APPROVED_REVIEWS=false`. Pull-mode
 Verify Account requests are polled only if `REQUEST_POLLING=true`.
+
+## Instant write-back inside Zoho (recommended)
+
+`zoho/deluge_dv_apply_review.dg` applies an approved review immediately, inside Zoho (no call to
+the engine): Workflow Rule on Document Verifications, "when Review Status is updated to Approved",
+action Function `dv_apply_review` with `review_id` = the record id. Same rules as the engine:
+only Approve/Edit rows, only text fields in the allowed list, Conflict when the Account changed;
+rows get Auto Applied, the record gets Applied / Conflict / Failed and a summary in Reviewer
+Notes. With this in place set `APPLY_APPROVED_REVIEWS=false` (the engine scheduler stays as a
+fallback option).

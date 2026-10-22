@@ -1,0 +1,125 @@
+void automation.dv_apply_review(String review_id)
+{
+	rev_id = review_id.toLong();
+	rec = zoho.crm.getRecordById("Document_Verifications",rev_id);
+	if(rec.get("Review_Status") != "Approved")
+	{
+		return;
+	}
+	acc = rec.get("Account");
+	if(acc == null)
+	{
+		fail = Map();
+		fail.put("Review_Status","Failed");
+		fail.put("Reviewer_Notes",ifnull(rec.get("Reviewer_Notes"),"") + " | Write-back: no Account linked.");
+		zoho.crm.updateRecord("Document_Verifications",rev_id,fail);
+		return;
+	}
+	acc_id = acc.get("id").toLong();
+	account = zoho.crm.getRecordById("Accounts",acc_id);
+	writable = List();
+	writable.add("Owner_Name");
+	writable.add("Tax_Identification_Number_TIN");
+	writable.add("Type_of_Business_Organization");
+	writable.add("Business_Style");
+	writable.add("Invoice_Company_Name");
+	writable.add("Billing_Street");
+	writable.add("Account_Name");
+	writable.add("Email");
+	writable.add("Phone");
+	writable.add("Contact_Person");
+	rows = rec.get("Proposed_Changes");
+	if(rows == null)
+	{
+		rows = List();
+	}
+	to_write = Map();
+	outcome = Map();
+	notes = "";
+	conflict = false;
+	for each  row in rows
+	{
+		row_id = row.get("id");
+		decision = ifnull(row.get("Decision"),"");
+		field = ifnull(row.get("Zoho_Field"),"");
+		value = ifnull(row.get("Proposed_Value"),"");
+		approved = false;
+		if(decision == "Approve")
+		{
+			approved = true;
+		}
+		if(decision == "Edit")
+		{
+			approved = true;
+		}
+		if(approved == false)
+		{
+			outcome.put(row_id,"No");
+		}
+		else if(writable.contains(field) == false)
+		{
+			outcome.put(row_id,"Skipped");
+			notes = notes + " | " + field + ": not written automatically";
+		}
+		else if(value == "")
+		{
+			outcome.put(row_id,"Skipped");
+			notes = notes + " | " + field + ": approved but Proposed Value is empty";
+		}
+		else
+		{
+			now_value = ifnull(account.get(field),"").toString().trim();
+			expected = ifnull(row.get("Current_Value"),"").toString().trim();
+			if(now_value.equalsIgnoreCase(expected))
+			{
+				to_write.put(field,value);
+				outcome.put(row_id,"Applied");
+				notes = notes + " | " + field + ": written";
+			}
+			else
+			{
+				outcome.put(row_id,"Skipped");
+				conflict = true;
+				notes = notes + " | " + field + ": CONFLICT, Account now has " + now_value;
+			}
+		}
+	}
+	status = "Applied";
+	if(conflict)
+	{
+		status = "Conflict";
+	}
+	if(to_write.size() > 0)
+	{
+		resp = zoho.crm.updateRecord("Accounts",acc_id,to_write);
+		if(resp.get("id") == null)
+		{
+			status = "Failed";
+			notes = notes + " | Account update failed: " + resp.toString();
+			for each  row in rows
+			{
+				if(outcome.get(row.get("id")) == "Applied")
+				{
+					outcome.put(row.get("id"),"Failed");
+				}
+			}
+		}
+	}
+	new_rows = List();
+	for each  row in rows
+	{
+		r = Map();
+		r.put("id",row.get("id"));
+		r.put("Auto_Applied",outcome.get(row.get("id")));
+		new_rows.add(r);
+	}
+	upd = Map();
+	upd.put("Review_Status",status);
+	upd.put("Proposed_Changes",new_rows);
+	if(rec.get("Reviewed_Time") == null)
+	{
+		upd.put("Reviewed_Time",zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss").replaceAll(" ","T") + "+08:00");
+	}
+	upd.put("Reviewer_Notes",ifnull(rec.get("Reviewer_Notes"),"") + " | Write-back" + notes);
+	zoho.crm.updateRecord("Document_Verifications",rev_id,upd);
+}
