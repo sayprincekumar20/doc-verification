@@ -164,3 +164,11 @@ skipped (Conflict). Each row's Auto Applied shows Applied / Skipped / Failed, Re
 a write-back summary, Reviewed Time is set, and Review Status becomes Applied, Conflict or
 Failed. File rows (ATTACH) are not automated yet. Later the hosted engine runs this
 automatically from the Approve transition.
+
+## Automatic write-back (scheduler)
+
+The `scheduler` service (`python -m app.tools.scheduler`, part of docker-compose) checks Zoho
+every `REVIEW_APPLY_INTERVAL_SECONDS` (120) for records with Review Status = **Approved** and
+applies them exactly like `scripts/apply_reviews.py --apply`; results go to the audit trail and,
+for engine jobs, to `field_updates`. Turn off with `APPLY_APPROVED_REVIEWS=false`. Pull-mode
+Verify Account requests are polled only if `REQUEST_POLLING=true`.

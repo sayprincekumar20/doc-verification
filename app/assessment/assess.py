@@ -103,6 +103,25 @@ def _is_sole_prop(docs: list[DocInput]) -> bool:
     return True  # DTI/permit-only accounts are sole proprietors in practice
 
 
+_EXPIRY_FIELD = {"DTI_BN_CERT": "valid_to", "MAYORS_PERMIT": "valid_until",
+                 "GOVERNMENT_ID": "expiry_date"}
+
+
+def valid_until_source(d: DocInput) -> str | None:
+    """Plain-language origin of a document's valid-until date, e.g.
+    'valid_to as printed: 29 June 2028' or 'derived: Dec 31 of the date issued (02/04/2026)'."""
+    if d.validity_status == "NO_EXPIRY" or d.document_type in ("BIR_2303", "CUSTOMER_INFO_SHEET"):
+        return "no expiry for this document type"
+    for issue in d.issues:
+        if issue.get("code") == "VALIDITY_DERIVED":
+            return "derived: " + str(issue.get("message", ""))
+    name = _EXPIRY_FIELD.get(d.document_type)
+    printed = ((d.fields.get(name) or {}).get("value")) if name else None
+    if printed:
+        return f"{name} as printed: {printed}"
+    return None
+
+
 def collect_facts(docs: list[DocInput]) -> dict[str, list[Fact]]:
     sole_prop = _is_sole_prop(docs)
     facts: dict[str, list[Fact]] = {a: [] for a in SOURCES}
@@ -349,7 +368,8 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
         status = "MISSING" if best is None else (best.validity_status or "UNKNOWN")
         requirements.append({"document_type": doc_type, "status": status,
                              "file": best.file_name if best else None,
-                             "valid_until": best.valid_until if best else None})
+                             "valid_until": best.valid_until if best else None,
+                             "valid_until_source": valid_until_source(best) if best else None})
 
     # File attachments for empty fileupload fields
     for doc_type, zoho_field in policy.FILE_FIELDS.items():
@@ -382,6 +402,7 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
         # Everything read from every file, as JSON: the fields and every other labelled item.
         "document_data": [{"file": d.file_name, "type": d.document_type,
                            "validity": d.validity_status, "valid_until": d.valid_until,
+                           "valid_until_source": valid_until_source(d),
                            "fields": {k: (v or {}).get("value") for k, v in d.fields.items()
                                       if (v or {}).get("value") not in (None, "")},
                            "other_fields": [{"label": o.get("label"), "value": o.get("value")}

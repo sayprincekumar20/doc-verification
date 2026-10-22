@@ -153,7 +153,9 @@ def build_record(assessment: dict, account_id: str, *, job_id: str | None = None
                                      for a in alerts), 2000, multiline=True),
         f["Required Documents"]: _text("\n".join(
             f"{r['document_type']}: {r['status']}"
-            + (f" (until {r['valid_until']})" if r.get("valid_until") else "")
+            + (f" (until {r['valid_until']}" + (f"; {r['valid_until_source']}"
+                                                  if r.get("valid_until_source") else "") + ")"
+               if r.get("valid_until") else "")
             + (f" - {short_name(r['file'])}" if r.get("file") else "")
             for r in assessment["requirements"]), 2000, multiline=True),
         f["Documents Found"]: len(assessment.get("documents") or []),

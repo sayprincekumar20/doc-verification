@@ -1,7 +1,9 @@
 """Business rules for Phase 1D. DRAFT: business owners must approve these before go-live.
 Change RULES_VERSION whenever a rule changes; it is stored with every assessment."""
 
-RULES_VERSION = "rules-draft-1"
+# rules-1.0 (2026-10-22): approved by the business = rules-draft-1 unchanged, plus the
+# "Corporation" value in Type of Business Organization.
+RULES_VERSION = "rules-1.0"
 
 # Documents required per business form (from BIR taxpayer type, else Zoho business type).
 REQUIRED_DOCUMENTS = {
@@ -20,7 +22,7 @@ EXPIRED_REQUIRED_DOCUMENT = "INACTIVE"
 BUSINESS_FORM_TO_ZOHO = {
     "SOLE_PROPRIETORSHIP": "Single Proprietorship",
     "PARTNERSHIP": "Partnership",
-    "CORPORATION": None,
+    "CORPORATION": "Corporation",   # value added to the Zoho picklist (decision 2026-10-22)
 }
 
 # Zoho fileupload fields filled with the document of this type (latest valid one).

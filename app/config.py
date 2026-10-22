@@ -71,7 +71,11 @@ class Settings(BaseSettings):
 
     # Pull mode: the Verify Account button only marks the Account in Zoho; the engine polls for
     # marked Accounts (no inbound connection to the engine needed: works behind any router).
+    request_polling: bool = False                      # pull mode off unless switched on
     poll_interval_seconds: int = 60
+    # Approved reviews in Zoho are applied to their Accounts by the scheduler every N seconds.
+    apply_approved_reviews: bool = True
+    review_apply_interval_seconds: int = 120
     request_flag_field: str = "DV_Requested"            # Checkbox on Accounts
     request_reason_field: str = "DV_Request_Reason"     # Multi-line
     request_by_field: str = "DV_Requested_By"           # Single line (email)

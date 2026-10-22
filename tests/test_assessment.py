@@ -134,7 +134,8 @@ def test_corporation_needs_sec_and_has_no_picklist_value():
     assert a["recommendation"] == "MANUAL_REVIEW"
     assert any("SEC_CERT" in r for r in a["reasons"])
     p = by_field(a)
-    assert p["Type_of_Business_Organization"]["action"] == "NO_PICKLIST_VALUE"
+    assert p["Type_of_Business_Organization"]["action"] == "FILL"
+    assert p["Type_of_Business_Organization"]["proposed_value"] == "Corporation"
     assert "Owner_Name" not in p  # a corporation's name is not a person
     assert p["Account_Name"]["action"] == "DIFFERS"  # brand vs registered name, flagged only
     assert p["Invoice_Company_Name"]["proposed_value"] == "EXAMPLE FOODS INC."  # as printed
@@ -174,3 +175,21 @@ def test_match_with_zoho_never_needs_attention():
                [low, dti(), permit()], TODAY)
     p = by_field(a)["Tax_Identification_Number_TIN"]
     assert p["action"] == "MATCH" and p["needs_attention"] is False
+
+
+def test_valid_until_source_is_explained():
+    from app.assessment.assess import valid_until_source
+    d = dti(until="2028-06-29")
+    d.fields["valid_to"] = f("29 June 2028")
+    assert valid_until_source(d) == "valid_to as printed: 29 June 2028"
+    p = permit()
+    p.issues = [{"code": "VALIDITY_DERIVED", "severity": "INFO",
+                 "message": "No expiry printed; valid until 2026-12-31 "
+                            "(Dec 31 of the date issued)"}]
+    assert valid_until_source(p).startswith("derived: No expiry printed")
+    assert valid_until_source(bir()) == "no expiry for this document type"
+    a = assess(SNAPSHOT, [bir(), d, permit()], TODAY)
+    data = {x["type"]: x for x in a["document_data"]}
+    assert data["DTI_BN_CERT"]["valid_until_source"] == "valid_to as printed: 29 June 2028"
+    req = {r["document_type"]: r for r in a["requirements"]}
+    assert req["DTI_BN_CERT"]["valid_until_source"] == "valid_to as printed: 29 June 2028"

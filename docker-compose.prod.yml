@@ -52,10 +52,10 @@ services:
     volumes: ["files:/data/files"]   # temporary working copies only
     restart: unless-stopped
 
-  poller:
+  scheduler:
     build: .
     env_file: .env
-    command: ["python", "-m", "app.tools.poll_requests"]
+    command: ["python", "-m", "app.tools.scheduler"]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
