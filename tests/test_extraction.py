@@ -102,10 +102,18 @@ def test_poor_page_lowers_confidence():
     assert r.fields["bn_number"].confidence == round(0.95 * 0.75, 2)
 
 
-def test_mayors_permit_expires_end_of_permit_year():
+def test_permit_without_printed_expiry_is_no_expiry(monkeypatch):
+    """Rule 2026-10-22: never assume an expiry that is not printed..."""
     text = "MAYOR'S PERMIT Series of 2025 Business Name EXAMPLE MARKET Permit No. 0420"
     fake = FakeVision({"business_name": "EXAMPLE MARKET", "owner_name": "JUAN DELA CRUZ",
                        "permit_number": "0420", "permit_year": "2025"}, "MAYORS_PERMIT")
+    r = extract_document(_pages(text), "MAYORS_PERMIT", fake, today=date(2026, 1, 5))
+    assert r.validity_status == "NO_EXPIRY" and r.valid_until is None
+    assert any(i["code"] == "NO_EXPIRY_PRINTED" for i in r.issues)
+
+    # ...unless the rule book assumes one for this document type
+    from app.assessment import policy
+    monkeypatch.setitem(policy.ASSUMED_EXPIRY, "MAYORS_PERMIT", "DEC_31_OF_ISSUE_YEAR")
     r = extract_document(_pages(text), "MAYORS_PERMIT", fake, today=date(2026, 1, 5))
     assert r.validity_status == "EXPIRED" and r.valid_until == "2025-12-31"
 

@@ -110,6 +110,9 @@ _EXPIRY_FIELD = {"DTI_BN_CERT": "valid_to", "MAYORS_PERMIT": "valid_until",
 def valid_until_source(d: DocInput) -> str | None:
     """Plain-language origin of a document's valid-until date, e.g.
     'valid_to as printed: 29 June 2028' or 'derived: Dec 31 of the date issued (02/04/2026)'."""
+    for issue in d.issues:
+        if issue.get("code") == "NO_EXPIRY_PRINTED":
+            return "no expiry date printed on this document"
     if d.validity_status == "NO_EXPIRY" or d.document_type in ("BIR_2303", "CUSTOMER_INFO_SHEET"):
         return "no expiry for this document type"
     for issue in d.issues:

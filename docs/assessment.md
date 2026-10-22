@@ -34,9 +34,14 @@ normalized; one address containing the other is SAME; **any changed number is DI
   (status DIFFERS, INFO).
 
 Other rules from real customers: a business name differing by a misread letter or two (>= 90%
-similar, same numbers) is LIKELY_CONSISTENT; a Mayor's permit without a printed expiry is valid
-to Dec 31 of its permit/issue year (VALIDITY_DERIVED); a required document whose validity is
-UNKNOWN blocks ACTIVE.
+similar, same numbers) is LIKELY_CONSISTENT; a required document whose validity is UNKNOWN blocks
+ACTIVE.
+
+**Expiry dates (rules-1.1):** only printed expiry dates are used. A document without one is
+NO_EXPIRY ("No expiry date printed on this document", WARNING for the reviewer to check) and
+counts as valid. Assumed expiries are added per document type in the rule book
+`policy.ASSUMED_EXPIRY`, e.g. `{"MAYORS_PERMIT": "DEC_31_OF_ISSUE_YEAR"}` (then VALIDITY_DERIVED).
+The engine re-applies the current rules at every assessment, also to cached AI results.
 
 ## 2. Proposals for Zoho
 

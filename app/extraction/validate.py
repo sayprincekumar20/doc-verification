@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import date
 
+from app.assessment import policy
 from app.extraction.fields import FieldSpec
 from app.extraction.normalize import parse_date
 
@@ -60,9 +61,8 @@ def check_validity(document_type: str, normalized: dict, today: date) -> Validit
     if document_type == "MAYORS_PERMIT":
         end = _d(normalized, "valid_until")
         issues = []
-        if end is None:
-            # Permits run to Dec 31 of their year. Some (e.g. Manila e-permits) only say so in
-            # the terms, so use the permit year, else the year it was issued or paid.
+        if end is None and policy.ASSUMED_EXPIRY.get("MAYORS_PERMIT") == "DEC_31_OF_ISSUE_YEAR":
+            # Rule book: permits run to Dec 31 of their year (permit year, else issued/paid).
             year = normalized.get("permit_year")
             source = "permit year"
             if not (year and str(year).isdigit()):
@@ -73,7 +73,7 @@ def check_validity(document_type: str, normalized: dict, today: date) -> Validit
             if year and str(year).isdigit():
                 end = date(int(year), 12, 31)
                 issues.append(Issue("VALIDITY_DERIVED", f"No expiry printed; valid until "
-                                    f"{end.isoformat()} (Dec 31 of the {source})",
+                                    f"{end.isoformat()} (Dec 31 of the {source}, rule book)",
                                     "valid_until", "INFO"))
         return _status(_d(normalized, "date_issued"), end, today, issues)
 
@@ -90,9 +90,15 @@ def check_validity(document_type: str, normalized: dict, today: date) -> Validit
     return Validity("UNKNOWN")
 
 
+NO_EXPIRY_PRINTED = "No expiry date printed on this document"
+
+
 def _status(start: date | None, end: date | None, today: date, issues: list[Issue]) -> Validity:
     if end is None:
-        return Validity("UNKNOWN", None, issues)
+        # Rule (2026-10-22): never assume an expiry that the document does not print.
+        issues.append(Issue("NO_EXPIRY_PRINTED", NO_EXPIRY_PRINTED + " (check the document)",
+                            None, "WARNING"))
+        return Validity("NO_EXPIRY", None, issues)
     if end < today:
         issues.append(Issue("EXPIRED", f"Expired on {end.isoformat()} "
                                        f"({(today - end).days} days ago)", None, "CRITICAL"))

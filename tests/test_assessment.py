@@ -193,3 +193,16 @@ def test_valid_until_source_is_explained():
     assert data["DTI_BN_CERT"]["valid_until_source"] == "valid_to as printed: 29 June 2028"
     req = {r["document_type"]: r for r in a["requirements"]}
     assert req["DTI_BN_CERT"]["valid_until_source"] == "valid_to as printed: 29 June 2028"
+
+
+def test_required_document_without_printed_expiry_counts_as_valid():
+    from app.assessment.assess import valid_until_source
+    p = permit()
+    p.validity_status, p.valid_until = "NO_EXPIRY", None
+    p.issues = [{"code": "NO_EXPIRY_PRINTED", "severity": "WARNING",
+                 "message": "No expiry date printed on this document (check the document)"}]
+    a = assess(SNAPSHOT, [bir(), dti(), p], TODAY)
+    assert a["recommendation"] == "ACTIVE"
+    req = {r["document_type"]: r for r in a["requirements"]}
+    assert req["MAYORS_PERMIT"]["status"] == "NO_EXPIRY"
+    assert valid_until_source(p) == "no expiry date printed on this document"

@@ -3,7 +3,14 @@ Change RULES_VERSION whenever a rule changes; it is stored with every assessment
 
 # rules-1.0 (2026-10-22): approved by the business = rules-draft-1 unchanged, plus the
 # "Corporation" value in Type of Business Organization.
-RULES_VERSION = "rules-1.0"
+RULES_VERSION = "rules-1.1"
+# rules-1.1 (2026-10-22): no assumed expiry dates. A document without a printed expiry date is
+# "NO_EXPIRY" (shown as "No expiry date printed on this document"), unless ASSUMED_EXPIRY below
+# defines a rule for its type.
+
+# Rule book for documents whose expiry is not printed. Empty = never assume.
+# Supported: {"MAYORS_PERMIT": "DEC_31_OF_ISSUE_YEAR"}  (Dec 31 of the permit/issue/paid year)
+ASSUMED_EXPIRY: dict[str, str] = {}
 
 # Documents required per business form (from BIR taxpayer type, else Zoho business type).
 REQUIRED_DOCUMENTS = {

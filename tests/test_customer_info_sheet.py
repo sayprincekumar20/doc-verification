@@ -84,7 +84,12 @@ def test_business_name_misread_is_likely_same():
                           "NISHIKIKEN GENERAL MERCHANDISE") == LIKELY_SAME
 
 
-def test_manila_epermit_valid_until_end_of_issue_year():
+def test_manila_epermit_without_printed_expiry(monkeypatch):
+    v = check_validity("MAYORS_PERMIT", {"date_issued": "2026-02-04"}, TODAY)
+    assert v.status == "NO_EXPIRY" and v.valid_until is None
+    assert v.issues[0].code == "NO_EXPIRY_PRINTED"
+    from app.assessment import policy
+    monkeypatch.setitem(policy.ASSUMED_EXPIRY, "MAYORS_PERMIT", "DEC_31_OF_ISSUE_YEAR")
     v = check_validity("MAYORS_PERMIT", {"date_issued": "2026-02-04"}, TODAY)
     assert v.status == "VALID" and v.valid_until == "2026-12-31"
     assert v.issues[0].code == "VALIDITY_DERIVED"
