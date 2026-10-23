@@ -332,9 +332,9 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
             proposals.append(p)
 
     # Contact details -> Zoho (fill only; a different value is shown, never overwritten)
+    # (Contact_Person is "Bank Contact Person" in this org's Accounts: not a target.)
     for attribute, zoho_field, matcher in (
-            ("email", "Email", _MATCHERS["email"]), ("phone", "Phone", _MATCHERS["phone"]),
-            ("contact_person", "Contact_Person", match_person)):
+            ("email", "Email", _MATCHERS["email"]), ("phone", "Phone", _MATCHERS["phone"])):
         chosen = _best(facts[attribute])
         if chosen:
             p = _compare_field(zoho_field, snap.get(zoho_field), chosen, chosen.value,

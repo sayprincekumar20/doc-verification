@@ -49,9 +49,13 @@ def test_record_has_summary_and_one_row_per_proposal():
                      request_reason="for activation po Ma'am")
     assert r["Account"] == {"id": ACCOUNT_ID}
     assert r["Recommendation"] == "INACTIVE" and r["Review_Status"] == "Pending Review"
-    assert "[CRITICAL] DTI expired on 2026-05-11 -> Collect the renewed DTI" in r["Alerts"]
-    assert "Customer_Status: NO_CHANGE" in r["Recommendation_Reasons"]
-    assert "DTI_BN_CERT: EXPIRED (until 2026-05-11)" in r["Required_Documents"]
+    assert r["Alerts"].startswith("1. URGENT: DTI expired on 11 May 2026\n"
+                                  "   Action: Collect the renewed DTI")
+    reasons = r["Recommendation_Reasons"]
+    assert reasons.startswith("Recommendation: INACTIVE\nWhy:\n1. ")
+    assert "DTI Business Name Certificate" in reasons and "DTI_BN_CERT" not in reasons
+    assert "Customer Status: not changed." in reasons
+    assert "- DTI Business Name Certificate: EXPIRED on 11 May 2026" in r["Required_Documents"]
     rows = {row["Zoho_Field"]: row for row in r["Proposed_Changes"]}
     owner = rows["Owner_Name"]
     assert owner["Action"] == "CORRECT" and owner["Decision"] == "Pending"
@@ -188,10 +192,11 @@ def test_multiline_fields_keep_one_item_per_line_and_short_file_names():
             src["document"] = "attachment_5906238000061698187_IMG_20260113_092731.jpg"
     r = build_record(a, ACCOUNT_ID)
     reasons = r["Recommendation_Reasons"].split("\n")
-    assert len(reasons) == len(a["reasons"]) + 1          # + Customer_Status line
-    docs = r["Required_Documents"].split("\n")
-    assert len(docs) == len(a["requirements"])
-    assert docs[0].endswith("- IMG_20260113_092805.jpg") and "attachment_" not in docs[0]
+    assert reasons[0].startswith("Recommendation:") and reasons[1] == "Why:"
+    assert sum(1 for line in reasons if line[:1].isdigit()) == len(a["reasons"])
+    docs = r["Required_Documents"]
+    assert docs.count("\n- ") + 1 == len(a["requirements"])
+    assert "   File: IMG_20260113_092805.jpg" in docs and "attachment_" not in docs
     owner = next(x for x in r["Proposed_Changes"] if x["Zoho_Field"] == "Owner_Name")
     assert "attachment_" not in owner["Evidence"]
     first = owner["Evidence"].split("\n")[0]

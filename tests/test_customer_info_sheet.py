@@ -124,7 +124,7 @@ def test_sheet_confirms_tin_and_fills_contacts():
     assert props["Email"]["action"] == "FILL"
     assert props["Email"]["proposed_value"] == "juan@example.com"   # customer's own form first
     assert props["Phone"]["proposed_value"] == "09171234567"
-    assert props["Contact_Person"]["proposed_value"] == "Juan Dela Cruz"
+    assert "Contact_Person" not in props   # that field is "Bank Contact Person" in this org
     data = {d["type"]: d for d in a["document_data"]}
     assert data["MAYORS_PERMIT"]["other_fields"][2] == {"label": "No. of Emp.", "value": "3"}
     assert data["CUSTOMER_INFO_SHEET"]["fields"]["tin"] == "123-456-789-00000"

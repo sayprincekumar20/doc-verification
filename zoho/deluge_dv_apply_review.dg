@@ -27,7 +27,6 @@ void automation.dv_apply_review(String review_id)
 	writable.add("Account_Name");
 	writable.add("Email");
 	writable.add("Phone");
-	writable.add("Contact_Person");
 	rows = rec.get("Proposed_Changes");
 	if(rows == null)
 	{
