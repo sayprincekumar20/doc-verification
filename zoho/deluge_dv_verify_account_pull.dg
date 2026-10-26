@@ -1,0 +1,115 @@
+string standalone.dv_verify_account(String account_id, String reason, String user_id, String user_email, map crmAPIRequest)
+{
+	result = Map();
+	if(ifnull(account_id,"") == "")
+	{
+		req = ifnull(crmAPIRequest,Map());
+		params = ifnull(req.get("params"),Map());
+		body_text = ifnull(req.get("body"),"").toString();
+		args_text = params.get("arguments");
+		if(args_text == null && body_text.contains("arguments"))
+		{
+			args_text = body_text.toMap().get("arguments");
+		}
+		if(args_text != null)
+		{
+			sent = args_text.toString().toMap();
+		}
+		else if(body_text.contains("account_id"))
+		{
+			sent = body_text.toMap();
+		}
+		else
+		{
+			sent = params;
+		}
+		account_id = ifnull(sent.get("account_id"),"");
+		reason = ifnull(sent.get("reason"),"");
+		user_id = ifnull(sent.get("user_id"),"");
+		user_email = ifnull(sent.get("user_email"),"");
+	}
+	if(ifnull(account_id,"") == "")
+	{
+		params_text = ifnull(crmAPIRequest.get("params"),"").toString();
+		if(params_text.length() > 300)
+		{
+			params_text = params_text.subString(0,300);
+		}
+		body_text2 = ifnull(crmAPIRequest.get("body"),"").toString();
+		if(body_text2.length() > 300)
+		{
+			body_text2 = body_text2.subString(0,300);
+		}
+		result.put("ok",false);
+		result.put("message","No account id received. params=" + params_text + " | body=" + body_text2);
+		return result.toString();
+	}
+	acc_id = account_id.toLong();
+	rec = zoho.crm.getRecordById("Accounts",acc_id);
+	if(rec.get("id") == null)
+	{
+		result.put("ok",false);
+		result.put("message","Account not found.");
+		return result.toString();
+	}
+	attachments = zoho.crm.getRelatedRecords("Attachments","Accounts",acc_id);
+	if(attachments == null)
+	{
+		attachments = List();
+	}
+	notes = zoho.crm.getRelatedRecords("Notes","Accounts",acc_id);
+	if(notes == null)
+	{
+		notes = List();
+	}
+	count = attachments.size();
+	file_fields = List();
+	file_fields.add("BIR_Registration_COR");
+	file_fields.add("Business_registration");
+	file_fields.add("Business_Permit");
+	file_fields.add("General_Information_Sheet");
+	for each  fld in file_fields
+	{
+		val = rec.get(fld);
+		if(val != null)
+		{
+			count = count + val.size();
+		}
+	}
+	for each  n in notes
+	{
+		note_files = n.get("$attachments");
+		if(note_files != null)
+		{
+			count = count + note_files.size();
+		}
+	}
+	if(count == 0)
+	{
+		result.put("ok",false);
+		result.put("message","No documents found on this Account. Please attach the BIR 2303, DTI or SEC certificate and Mayors / Business Permit, then click Verify Account again.");
+		return result.toString();
+	}
+	if(rec.get("DV_Requested") == true)
+	{
+		result.put("ok",true);
+		result.put("message","A verification for this Account is already requested. The result will appear in Document Verifications (related list below) in 2-4 minutes.");
+		return result.toString();
+	}
+	now_text = zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss").replaceAll(" ","T") + "+08:00";
+	mark = Map();
+	mark.put("DV_Requested",true);
+	mark.put("DV_Requested_By",ifnull(user_email,""));
+	mark.put("DV_Requested_At",now_text);
+	mark.put("DV_Request_Reason",ifnull(reason,""));
+	upd = zoho.crm.updateRecord("Accounts",acc_id,mark);
+	if(upd.get("id") == null)
+	{
+		result.put("ok",false);
+		result.put("message","Could not request the verification: " + upd.toString());
+		return result.toString();
+	}
+	result.put("ok",true);
+	result.put("message","Verification requested for " + count + " document(s). The engine starts within a minute; the result will appear in Document Verifications (related list below) in 2-4 minutes.");
+	return result.toString();
+}
