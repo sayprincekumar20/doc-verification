@@ -20,6 +20,7 @@ DEFAULT_NAMES = {
         "Request Reason": "Request_Reason", "Proposed Changes": "Proposed_Changes",
         "Reviewer": "Reviewer", "Reviewed Time": "Reviewed_Time",
         "Reviewer Notes": "Reviewer_Notes", "Values Compared": "Values_Compared",
+        "Activate Account": "Activate_Account",
     },
     "subform_fields": {
         "Zoho Field": "Zoho_Field", "Field Label": "Field_Label",

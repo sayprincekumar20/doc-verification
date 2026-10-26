@@ -104,6 +104,27 @@ void automation.dv_apply_review(String review_id)
 			}
 		}
 	}
+	if(rec.get("Activate_Account") == true)
+	{
+		if(status == "Failed")
+		{
+			notes = notes + " | Account NOT activated: the field update failed";
+		}
+		else
+		{
+			act = Map();
+			act.put("Customer_Status","Active");
+			act_resp = zoho.crm.updateRecord("Accounts",acc_id,act);
+			if(act_resp.get("id") == null)
+			{
+				notes = notes + " | Activation failed: " + act_resp.toString();
+			}
+			else
+			{
+				notes = notes + " | Customer Status set to Active (reviewer decision)";
+			}
+		}
+	}
 	new_rows = List();
 	for each  row in rows
 	{

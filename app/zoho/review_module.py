@@ -61,6 +61,9 @@ MODULE_FIELDS = [
     FieldDef("Reviewer Notes", "textarea"),
     FieldDef("Values Compared", "boolean",
              note="Checkbox: 'I compared every approved value with the source document'"),
+    FieldDef("Activate Account", "boolean",
+             note="Checkbox in the Approve transition: the reviewer decides to set the "
+                  "Account's Customer Status to Active"),
     FieldDef(SUBFORM_LABEL, "subform"),
 ]
 

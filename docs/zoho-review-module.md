@@ -182,3 +182,11 @@ only Approve/Edit rows, only text fields in the allowed list, Conflict when the 
 rows get Auto Applied, the record gets Applied / Conflict / Failed and a summary in Reviewer
 Notes. With this in place set `APPLY_APPROVED_REVIEWS=false` (the engine scheduler stays as a
 fallback option).
+
+## Activating the Account after review (reviewer decides)
+
+Field **Activate Account** (Checkbox) on Document Verifications; add it to the **Approve**
+transition's DURING fields (not mandatory). When ticked, the write-back (`dv_apply_review`, or
+the engine fallback) sets the Account's `Customer_Status` to **Active** after writing the approved
+rows - never when the write-back Failed. The result is added to Reviewer Notes. The Accounts
+module must have the `Customer_Status` picklist with the value `Active`.

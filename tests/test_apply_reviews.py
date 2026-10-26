@@ -139,3 +139,20 @@ def test_command_refuses_production(env, capsys):
     env.write_text(env.read_text(encoding="utf-8").replace("sandbox.", "www."),
                    encoding="utf-8")
     assert apply_reviews.main(["--env", str(env), "--apply"]) == 2
+
+
+def test_reviewer_ticks_activate_account(settings):
+    fake = FakeZoho(record=review(Activate_Account=True))
+    result = apply_review(fake.client(settings), fake.record, dry_run=False)
+    assert result.status == "Applied" and result.activated is True
+    status_writes = [body for name, body in fake.puts if name == "Accounts"
+                     and "Customer_Status" in body["data"][0]]
+    assert status_writes[0]["data"][0]["Customer_Status"] == "Active"
+
+
+def test_no_activation_without_the_tick(settings):
+    fake = FakeZoho(record=review())
+    result = apply_review(fake.client(settings), fake.record, dry_run=False)
+    assert result.activated is None
+    assert not any("Customer_Status" in body["data"][0] for name, body in fake.puts
+                   if name == "Accounts")

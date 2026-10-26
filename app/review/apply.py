@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from app.assessment.alerts import ACTIVE_VALUE
 from app.zoho.client import ZohoClient
 from app.zoho.errors import ZohoError
 from app.zoho.review_record import load_names
@@ -42,6 +43,7 @@ class ApplyResult:
     rows: list[RowResult] = field(default_factory=list)
     status: str | None = None      # Applied | Conflict | Failed (None in dry run)
     error: str | None = None
+    activated: bool | None = None  # reviewer ticked Activate Account: True set / False failed
 
 
 def _norm(v) -> str:
@@ -118,6 +120,20 @@ def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
             datetime.now(UTC).replace(microsecond=0).isoformat()
     notes = [f"{r.zoho_field}: {r.outcome} - {r.detail}" for r in result.rows
              if r.outcome not in ("NOT_APPROVED",)]
+    # The reviewer decides activation (checkbox in the Approve transition); never on a failure.
+    if review.get(f.get("Activate Account", "Activate_Account")):
+        if result.status == "Failed":
+            result.activated = False
+            notes.append("Account NOT activated: the field update failed")
+        else:
+            try:
+                client.update_record("Accounts", result.account_id,
+                                     {"Customer_Status": ACTIVE_VALUE}, triggers)
+                result.activated = True
+                notes.append("Customer Status set to Active (reviewer decision)")
+            except ZohoError as exc:
+                result.activated = False
+                notes.append(f"Activation failed: {str(exc)[:300]}")
     if notes:
         update[f.get("Reviewer Notes", "Reviewer_Notes")] = "\n".join(
             filter(None, [review.get(f.get("Reviewer Notes", "Reviewer_Notes")),
