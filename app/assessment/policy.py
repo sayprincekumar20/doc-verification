@@ -1,9 +1,13 @@
 """Business rules for Phase 1D. DRAFT: business owners must approve these before go-live.
 Change RULES_VERSION whenever a rule changes; it is stored with every assessment."""
 
+import re
+
 # rules-1.0 (2026-10-22): approved by the business = rules-draft-1 unchanged, plus the
 # "Corporation" value in Type of Business Organization.
-RULES_VERSION = "rules-1.1"
+RULES_VERSION = "rules-1.2"
+# rules-1.2 (2026-10-28): activation also needs Payment Terms = COD, an Accounting contact with
+# name, mobile and email, and TIN / Invoice Company Name / Billing Address matching the documents.
 # rules-1.1 (2026-10-22): no assumed expiry dates. A document without a printed expiry date is
 # "NO_EXPIRY" (shown as "No expiry date printed on this document"), unless ASSUMED_EXPIRY below
 # defines a rule for its type.
@@ -70,7 +74,24 @@ AUTO_APPLY_RULES: dict[str, dict[str, int]] = {
     "Business_Style": {"FILL": 1},
     "Owner_Name": {"FILL": 1, "CORRECT": 2},
     "Invoice_Company_Name": {"FILL": 1, "CORRECT": 2},
+    "Billing_Street": {"FILL": 1},          # empty address only (decision 2026-10-28)
 }
 AUTO_APPLY_GROUNDINGS = {"EXACT", "CROSS_CHECKED"}
-# Never automatic: Account_Name, addresses, attachments. Customer_Status may only be set to
-# Active (app/assessment/alerts.py: status_decision); it is never set Inactive.
+# Never automatic: Account_Name, changing an address, attachments. Customer_Status may only be
+# set to Active (app/assessment/alerts.py: status_decision); it is never set Inactive.
+
+
+# ---------------- Activation checks (rules-1.2) ----------------
+# Payment Terms (Accounts.Credit_Terms) values meaning Cash on Delivery: matched as whole words,
+# case-insensitive. Only COD accounts are verified (the button checks this first).
+COD_PAYMENT_TERMS = ("COD", "CASH ON DELIVERY")
+# The Accounting contact: a Contact of the Account whose "Contact of" says Accounting. Fields
+# are tried in order (production "Contact of" first; sandbox has Position_Role / Department).
+CONTACT_ROLE_FIELDS = ("Contact_of", "Contact_Of", "Contact_Type", "Department",
+                       "Position_Role", "Contact_Category")
+ACCOUNTING_ROLE = "ACCOUNTING"
+
+
+def is_cod(payment_terms) -> bool:
+    text = " ".join(str(payment_terms or "").upper().replace("-", " ").split())
+    return any(re.search(rf"\b{re.escape(t)}\b", text) for t in COD_PAYMENT_TERMS)

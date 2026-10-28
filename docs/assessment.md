@@ -83,3 +83,20 @@ Every recommendation and proposal goes to a human reviewer (Phase 3) before Zoho
 | Bistro, Tacloban | INACTIVE | 2025 Mayor's permit expired; owner, TIN, type, invoice name filled |
 | Account with permit + ID | MANUAL_REVIEW | permit and ID belong to different people (all changes on HOLD); BIR 2303 missing |
 | Restaurant branch (corporation) | MANUAL_REVIEW | SEC certificate and Mayor's permit missing; brand name differs from registered name |
+
+## Activation checks (rules-1.2)
+
+Besides valid, consistent documents, an Account becomes **Active automatically** only if:
+
+| Check | Passes when |
+| --- | --- |
+| Payment Terms is COD | `Credit_Terms` is "COD" / "Cash on Delivery" (the button also refuses non-COD accounts) |
+| Accounting contact | a Contact of the Account with "Contact of" (or Department / Position / Category) = Accounting, with a name, a mobile number (10+ digits) and a real email (no placeholder) |
+| TIN | the Account's TIN equals the BIR 2303 TIN (format ignored), or it is filled/corrected automatically in the same run |
+| Invoice Company Name | matches the registered name (corporations) / business name, or is filled automatically |
+| Billing Address | Street + City + Province + Code match the BIR 2303 address, or an empty address is filled automatically |
+
+"Automatically" = the update passes the auto-apply rules (confidence >= 0.95, OCR-confirmed).
+A check that is not met makes the recommendation MANUAL_REVIEW; the review record lists every
+check (OK / AFTER UPDATE / NOT MET) under "Activation checks". The values and field names are in
+`app/assessment/policy.py` (COD_PAYMENT_TERMS, CONTACT_ROLE_FIELDS, ACCOUNTING_ROLE).

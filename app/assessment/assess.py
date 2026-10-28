@@ -397,10 +397,16 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
                                "which documents belong to this customer first. " + p["reason"])
 
     recommendation, reasons = _recommend(checks, requirements, docs)
+    activation = activation_checks(snap, facts, proposals, form)
+    failed = [c for c in activation if c["status"] == "FAIL"]
+    if recommendation == "ACTIVE" and failed:
+        recommendation = "MANUAL_REVIEW"
+        reasons = [f"Activation check not met: {c['label']} - {c['detail']}" for c in failed]
     return {
         "rules_version": policy.RULES_VERSION, "assessed_on": today.isoformat(),
         "business_form": form, "recommendation": recommendation, "reasons": reasons,
         "requirements": requirements, "cross_document": checks, "proposals": proposals,
+        "activation_checks": activation,
         "facts": {a: [asdict(f) for f in fs] for a, fs in facts.items() if fs},
         # Everything read from every file, as JSON: the fields and every other labelled item.
         "document_data": [{"file": d.file_name, "type": d.document_type,
@@ -415,6 +421,93 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
                        "critical_issues": [i["code"] for i in d.issues
                                            if i.get("severity") == "CRITICAL"]} for d in docs],
     }
+
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
+PLACEHOLDER_EMAILS = ("fakeemail", "emailnotfound", "noemail", "none@", "na@", "test@")
+
+
+def _real_email(value) -> bool:
+    v = str(value or "").strip().lower()
+    return bool(_EMAIL_RE.match(v)) and not any(p in v for p in PLACEHOLDER_EMAILS)
+
+
+def _mobile_ok(value) -> bool:
+    return len(re.sub(r"\D", "", str(value or ""))) >= 10
+
+
+def _proposal_for(proposals: list[dict], field: str) -> dict | None:
+    return next((p for p in proposals if p["zoho_field"] == field), None)
+
+
+def _field_check(key: str, label: str, field: str, current, best, matcher, proposals,
+                 ) -> dict:
+    """PASS when the Account holds the document value; AFTER_UPDATE when an update of this
+    field is proposed (it counts only if it is applied automatically, see status_decision);
+    FAIL otherwise."""
+    p = _proposal_for(proposals, field)
+    if best is None:
+        return {"key": key, "label": label, "status": "FAIL", "field": field,
+                "detail": "not found on the documents"}
+    if current not in (None, "") and matcher(current, best.value) in (SAME, LIKELY_SAME):
+        return {"key": key, "label": label, "status": "PASS", "field": field,
+                "detail": f"matches {best.document_type}: {best.value}"}
+    if p and p["action"] in ("FILL", "CORRECT"):
+        return {"key": key, "label": label, "status": "AFTER_UPDATE", "field": field,
+                "detail": f"{'empty' if current in (None, '') else current!s} - to be "
+                          f"{'filled' if p['action'] == 'FILL' else 'corrected'} with "
+                          f"{p['proposed_value']}"}
+    return {"key": key, "label": label, "status": "FAIL", "field": field,
+            "detail": ("empty in Zoho" if current in (None, "") else
+                       f"Zoho has {current}, documents say {best.value}")}
+
+
+def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str) -> list[dict]:
+    """rules-1.2: the Account data an Active (COD) customer must have, checked against the
+    documents."""
+    out = []
+    terms = snap.get("Credit_Terms")
+    out.append({"key": "payment_terms", "label": "Payment Terms is COD",
+                "status": "PASS" if policy.is_cod(terms) else "FAIL", "field": "Credit_Terms",
+                "detail": f"Payment Terms: {terms or 'empty'}"})
+
+    contacts = snap.get("_contacts")
+    if contacts is None:
+        status, detail = "FAIL", "Contacts could not be read"
+    else:
+        accounting = [c for c in contacts if any(
+            policy.ACCOUNTING_ROLE in str(v).upper() for v in (c.get("roles") or {}).values())]
+        complete = [c for c in accounting if c.get("name") and _mobile_ok(c.get("mobile"))
+                    and _real_email(c.get("email"))]
+        if complete:
+            status, detail = "PASS", f"{complete[0]['name']} ({complete[0]['email']})"
+        elif accounting:
+            c = accounting[0]
+            missing = [n for n, ok in (("name", bool(c.get("name"))),
+                                       ("mobile", _mobile_ok(c.get("mobile"))),
+                                       ("email", _real_email(c.get("email")))) if not ok]
+            status, detail = "FAIL", f"{c.get('name') or 'Accounting contact'} has no " \
+                                     f"valid {', '.join(missing)}"
+        else:
+            status, detail = "FAIL", "no Contact with Contact of = Accounting"
+    out.append({"key": "accounting_contact", "label": "Accounting contact (name, mobile, email)",
+                "status": status, "field": None, "detail": detail})
+
+    out.append(_field_check("tin", "TIN matches the BIR 2303", "Tax_Identification_Number_TIN",
+                            snap.get("Tax_Identification_Number_TIN"), _best(facts["tin"]),
+                            lambda a, b: match_tin(a, b) or DIFFERENT, proposals))
+    name_attr = "registered_name" if form in ("CORPORATION", "PARTNERSHIP") else "business_name"
+    out.append(_field_check("invoice_name", "Invoice Company Name matches the documents",
+                            "Invoice_Company_Name", snap.get("Invoice_Company_Name"),
+                            _best(facts[name_attr]) or _best(facts["business_name"]),
+                            lambda a, b: match_business(a, b) or DIFFERENT, proposals))
+    address = ", ".join(str(snap[f]) for f in ("Billing_Street", "Billing_City",
+                                               "Billing_Province", "Billing_Code")
+                        if snap.get(f) not in (None, "", "-None-"))
+    out.append(_field_check("billing_address", "Billing Address matches the documents",
+                            "Billing_Street", address or None, _best(facts["address"]),
+                            lambda a, b: match_address(a, b) or DIFFERENT, proposals))
+    return out
 
 
 def _recommend(checks, requirements, docs) -> tuple[str, list[str]]:

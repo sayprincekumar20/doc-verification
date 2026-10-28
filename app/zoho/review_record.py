@@ -116,11 +116,24 @@ def _date(iso: str | None) -> str:
     return f"{int(m.group(3))} {_MONTHS[int(m.group(2)) - 1]} {m.group(1)}" if m else (iso or "")
 
 
+# Short document names for sentences (the Required Documents list uses the full names).
+SHORT_LABELS = {"BIR_2303": "BIR 2303", "DTI_BN_CERT": "DTI certificate",
+                "MAYORS_PERMIT": "Mayor's permit", "SEC_CERT": "SEC certificate",
+                "GOVERNMENT_ID": "government ID", "CUSTOMER_INFO_SHEET":
+                "Customer Information Sheet", "BARANGAY_CLEARANCE": "barangay clearance",
+                "FDA_LTO": "FDA license", "SANITARY_PERMIT": "sanitary permit"}
+
+
 def humanize(text: str) -> str:
-    """Document codes -> names, ISO dates -> '31 Dec 2025', field codes -> words."""
+    """Document codes -> short names, field codes -> labels, ISO dates -> '31 Dec 2025'."""
     from app.assessment.alerts import DOCUMENT_LABELS
-    for code, label in DOCUMENT_LABELS.items():
-        text = re.sub(rf"\b{code}\b", label, text)
+    for code, name in SHORT_LABELS.items():
+        text = re.sub(rf"\b{code}\b", name, text)
+    for code, name in DOCUMENT_LABELS.items():
+        text = re.sub(rf"\b{code}\b", name, text)
+    for code, name in sorted(FIELD_LABELS.items(), key=lambda x: -len(x[0])):
+        text = re.sub(rf"\b{code}\b", name.replace(" (file)", " file"), text)
+    text = text.replace("MANUAL_REVIEW", "manual review")
     text = _ISO_DATE.sub(lambda m: _date(m.group(0)), text)
     for code, word in _WORDS.items():
         text = re.sub(rf"\b{code}\b", word, text)
@@ -159,14 +172,27 @@ def format_requirements(requirements: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def format_reasons(recommendation: str, reasons: list[str], status: dict | None) -> str:
+_CHECK_WORD = {"PASS": "OK", "AFTER_UPDATE": "AFTER UPDATE", "FAIL": "NOT MET"}
+
+
+def format_reasons(recommendation: str, reasons: list[str], status: dict | None,
+                   checks: list[dict] | None = None) -> str:
     lines = [f"Recommendation: {recommendation.replace('_', ' ')}", "Why:"]
     lines += [f"{i}. {humanize(r)}" for i, r in enumerate(reasons, 1)]
+    if checks:
+        lines += ["", "Activation checks:"]
+        lines += [f"- {_CHECK_WORD.get(c['status'], c['status'])}: {c['label']} "
+                  f"({humanize(str(c['detail']))})" for c in checks]
     if status:
-        what = {"ACTIVATE": "set to Active automatically",
-                "ALREADY_ACTIVE": "already Active (no change)"}.get(status["decision"],
-                                                                     "not changed")
-        lines += ["", f"Customer Status: {what}. {humanize(status['reason'])}"]
+        if status["decision"] == "ACTIVATE":
+            line = "set to Active automatically."
+        elif status["decision"] == "ALREADY_ACTIVE":
+            line = "already Active (no change)."
+        elif status["reason"].startswith("Recommendation is"):
+            line = "not changed (a person decides after the review)."
+        else:
+            line = f"not changed. {humanize(status['reason'])}"
+        lines += ["", f"Customer Status: {line}"]
     return "\n".join(lines)
 
 
@@ -215,7 +241,8 @@ def build_record(assessment: dict, account_id: str, *, job_id: str | None = None
         f["Review Status"]: review_status(assessment),
         f["Recommendation"]: assessment["recommendation"],
         f["Recommendation Reasons"]: _text(format_reasons(
-            assessment["recommendation"], assessment["reasons"], status), 2000, multiline=True),
+            assessment["recommendation"], assessment["reasons"], status,
+            assessment.get("activation_checks")), 2000, multiline=True),
         f["Alerts"]: _text(format_alerts(alerts), 2000, multiline=True),
         f["Required Documents"]: _text(format_requirements(assessment["requirements"]), 2000,
                                        multiline=True),

@@ -36,6 +36,7 @@ SCOPES = [
     "ZohoCRM.modules.custom.UPDATE",
     "ZohoCRM.modules.attachments.CREATE",
     "ZohoCRM.modules.notes.READ",
+    "ZohoCRM.modules.contacts.READ",       # Accounting-contact activation check (rules-1.2)
     "ZohoCRM.modules.attachments.READ",
     "ZohoCRM.settings.fields.READ",
     "ZohoCRM.settings.modules.READ",

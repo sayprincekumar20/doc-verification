@@ -53,8 +53,8 @@ def test_record_has_summary_and_one_row_per_proposal():
                                   "   Action: Collect the renewed DTI")
     reasons = r["Recommendation_Reasons"]
     assert reasons.startswith("Recommendation: INACTIVE\nWhy:\n1. ")
-    assert "DTI Business Name Certificate" in reasons and "DTI_BN_CERT" not in reasons
-    assert "Customer Status: not changed." in reasons
+    assert "DTI certificate" in reasons and "DTI_BN_CERT" not in reasons
+    assert "Customer Status: not changed" in reasons
     assert "- DTI Business Name Certificate: EXPIRED on 11 May 2026" in r["Required_Documents"]
     rows = {row["Zoho_Field"]: row for row in r["Proposed_Changes"]}
     owner = rows["Owner_Name"]

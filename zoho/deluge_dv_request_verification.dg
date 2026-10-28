@@ -6,6 +6,32 @@ string button.dv_request_verification(String account_id)
 	{
 		return "Account not found.";
 	}
+	terms = ifnull(rec.get("Credit_Terms"),"").toString().trim().toUpperCase();
+	cod = false;
+	if(terms == "COD")
+	{
+		cod = true;
+	}
+	if(terms.startsWith("COD "))
+	{
+		cod = true;
+	}
+	if(terms.endsWith(" COD"))
+	{
+		cod = true;
+	}
+	if(terms.contains("(COD)"))
+	{
+		cod = true;
+	}
+	if(terms.contains("CASH ON DELIVERY"))
+	{
+		cod = true;
+	}
+	if(cod == false)
+	{
+		return "Verification is only for COD (Cash on Delivery) accounts. This Account has Payment Terms: " + ifnull(rec.get("Credit_Terms"),"empty") + ".";
+	}
 	attachments = zoho.crm.getRelatedRecords("Attachments","Accounts",acc_id);
 	if(attachments == null)
 	{

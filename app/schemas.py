@@ -50,6 +50,8 @@ class JobCreate(BaseModel):
         default=None, max_length=500, description="Attachments related list of the Account")
     notes: list[dict[str, Any]] | None = Field(
         default=None, max_length=500, description="Notes related list (with $attachments)")
+    contacts: list[dict[str, Any]] | None = Field(
+        default=None, max_length=500, description="Contacts related list of the Account")
 
     @field_validator("customer_number", mode="before")
     @classmethod

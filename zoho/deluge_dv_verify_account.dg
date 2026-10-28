@@ -52,6 +52,34 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 		result.put("message","Account not found.");
 		return result.toString();
 	}
+	terms = ifnull(rec.get("Credit_Terms"),"").toString().trim().toUpperCase();
+	cod = false;
+	if(terms == "COD")
+	{
+		cod = true;
+	}
+	if(terms.startsWith("COD "))
+	{
+		cod = true;
+	}
+	if(terms.endsWith(" COD"))
+	{
+		cod = true;
+	}
+	if(terms.contains("(COD)"))
+	{
+		cod = true;
+	}
+	if(terms.contains("CASH ON DELIVERY"))
+	{
+		cod = true;
+	}
+	if(cod == false)
+	{
+		result.put("ok",false);
+		result.put("message","Verification is only for COD (Cash on Delivery) accounts. This Account has Payment Terms: " + ifnull(rec.get("Credit_Terms"),"empty") + ".");
+		return result.toString();
+	}
 	attachments = zoho.crm.getRelatedRecords("Attachments","Accounts",acc_id);
 	if(attachments == null)
 	{
@@ -106,6 +134,12 @@ string standalone.dv_verify_account(String account_id, String reason, String use
 	payload.put("account",rec);
 	payload.put("attachments",attachments);
 	payload.put("notes",notes);
+	contacts = zoho.crm.getRelatedRecords("Contacts","Accounts",acc_id);
+	if(contacts == null)
+	{
+		contacts = List();
+	}
+	payload.put("contacts",contacts);
 	engine_url = zoho.crm.getOrgVariable("dv_engine_url") + "/v1/jobs";
 	request_headers = Map();
 	request_headers.put("Content-Type","application/json");

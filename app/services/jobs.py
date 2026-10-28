@@ -38,7 +38,8 @@ def create_or_get_active_job(db: Session, req: JobCreate) -> tuple[VerificationJ
         requested_at=req.requested_at,
         button_data={k: v for k, v in (("account", req.account),
                                        ("attachments", req.attachments),
-                                       ("notes", req.notes)) if v is not None} or None,
+                                       ("notes", req.notes),
+                                       ("contacts", req.contacts)) if v is not None} or None,
     )
     db.add(job)
     try:

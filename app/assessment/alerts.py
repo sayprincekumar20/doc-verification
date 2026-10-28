@@ -53,10 +53,10 @@ def build_alerts(assessment: dict, today: date) -> list[dict]:
                                "action": f"Remind the customer to renew the {doc}"})
     for c in assessment["cross_document"]:
         if c["status"] == "CONFLICT" and c["severity"] == "CRITICAL":
-            values = "; ".join(f"{v['type']}: {v['value']}" for v in c["values"])
+            values = " vs ".join(f"{v['value']} ({v['type']})" for v in c["values"])
             alerts.append({"severity": "CRITICAL", "code": "DOCUMENT_CONFLICT",
                            "document_type": None,
-                           "message": f"Documents disagree on {c['attribute']} ({values})",
+                           "message": f"Documents disagree on {c['attribute']}: {values}",
                            "action": "Check whether these documents belong to this customer"})
     for d in assessment["documents"]:
         for code in d.get("critical_issues", []):
@@ -110,10 +110,23 @@ def status_decision(assessment: dict, current_status: str | None, threshold: flo
         if best < threshold and zoho_field[attribute] not in matched_in_zoho:
             return "NO_CHANGE", (f"{attribute} not confirmed (confidence {best} < {threshold} "
                                  "and Zoho has no matching value); a person must check.")
+    # rules-1.2 activation checks (COD, Accounting contact, TIN / invoice name / address).
+    from app.assessment.auto_apply import blocking_problems, decide
+    blockers = blocking_problems(assessment)
+    for c in assessment.get("activation_checks") or []:
+        if c["status"] == "FAIL":
+            return "NO_CHANGE", f"{c['label']}: {c['detail']}"
+        if c["status"] == "AFTER_UPDATE":
+            p = next((x for x in assessment["proposals"] if x["zoho_field"] == c["field"]), None)
+            ok, why = decide(p, threshold, blockers) if p else (False, "no proposal")
+            if not ok:
+                return "NO_CHANGE", (f"{c['label']}: {c['detail']}; not updated automatically "
+                                     f"({why}), a person must approve it.")
     if is_active:
         return "ALREADY_ACTIVE", "Documents complete and valid; account already Active."
     return "ACTIVATE", "All required documents present, valid and consistent; owner and TIN " \
-                       "confirmed."
+                       "confirmed; COD, Accounting contact, TIN, invoice name and billing " \
+                       "address checked."
 
 
 def format_note(assessment: dict, alerts: list[dict], status: tuple[str, str],

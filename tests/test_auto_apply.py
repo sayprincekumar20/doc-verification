@@ -38,7 +38,8 @@ def assessment(*proposals, cross=(), critical=(), recommendation="MANUAL_REVIEW"
     ({"grounding": "NOT_FOUND"}, False, "not confirmed"),
     ({"grounding": "FUZZY"}, False, "not confirmed"),
     ({"needs_attention": True}, False, "needs attention"),
-    ({"zoho_field": "Billing_Street"}, False, "always goes to review"),
+    ({"zoho_field": "Billing_Street", "action": "CORRECT"}, False, "always goes to review"),
+    ({"zoho_field": "Account_Name"}, False, "always goes to review"),
     ({"action": "CORRECT", "current_value": "111-111-111-00000"}, False, "2 agreeing"),
 ])
 def test_decide_rules(change, auto, why):

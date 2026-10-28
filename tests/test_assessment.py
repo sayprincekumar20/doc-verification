@@ -77,9 +77,12 @@ def permit(owner="JUAN DELA CRUZ", business="JUAN'S MEAT SHOP", until="2026-12-3
         "business_address": f("PUROK 1 MASAGANA BAY")}, status, until)
 
 
+ACCOUNTING = {"name": "MARIA SANTOS", "email": "maria@juanmeat.ph", "mobile": "0917 123 4567",
+              "roles": {"Contact_of": "Accounting"}}
 SNAPSHOT = {"Account_Name": "JUAN MEAT SHOP", "Invoice_Company_Name": "JUAN MEAT SHOP",
             "Owner_Name": "SALES REP NAME", "Owner": {"name": "SALES REP NAME"},
-            "Billing_Street": "Purok 1 Brgy. Masagana, Bay"}
+            "Billing_Street": "Purok 1 Brgy. Masagana, Bay", "Credit_Terms": "COD",
+            "_contacts": [ACCOUNTING]}
 
 
 def by_field(a):
@@ -206,3 +209,68 @@ def test_required_document_without_printed_expiry_counts_as_valid():
     req = {r["document_type"]: r for r in a["requirements"]}
     assert req["MAYORS_PERMIT"]["status"] == "NO_EXPIRY"
     assert valid_until_source(p) == "no expiry date printed on this document"
+
+
+def checks_of(a):
+    return {c["key"]: c for c in a["activation_checks"]}
+
+
+def test_activation_checks_all_met():
+    c = checks_of(assess(SNAPSHOT, [bir(), dti(), permit()], TODAY))
+    assert c["payment_terms"]["status"] == "PASS"
+    assert c["accounting_contact"]["status"] == "PASS"
+    assert c["invoice_name"]["status"] == "PASS"
+    assert c["billing_address"]["status"] == "PASS"
+    assert c["tin"]["status"] == "AFTER_UPDATE"          # empty in Zoho, filled from the BIR 2303
+
+
+def test_not_cod_means_manual_review():
+    a = assess({**SNAPSHOT, "Credit_Terms": "Net 30"}, [bir(), dti(), permit()], TODAY)
+    assert a["recommendation"] == "MANUAL_REVIEW"
+    assert "Payment Terms is COD" in a["reasons"][0]
+
+
+def test_cod_spellings():
+    from app.assessment.policy import is_cod
+    assert is_cod("COD") and is_cod("Cash on Delivery") and is_cod("C.O.D".replace(".", ""))
+    assert not is_cod("Net 30") and not is_cod("CODE 7") and not is_cod(None)
+
+
+def test_accounting_contact_needs_name_mobile_and_real_email():
+    bad = {**ACCOUNTING, "email": "fakeemail@gmail.com"}
+    a = assess({**SNAPSHOT, "_contacts": [bad]}, [bir(), dti(), permit()], TODAY)
+    c = checks_of(a)["accounting_contact"]
+    assert c["status"] == "FAIL" and "email" in c["detail"]
+    other_role = {**ACCOUNTING, "roles": {"Contact_of": "Purchasing"}}
+    c = checks_of(assess({**SNAPSHOT, "_contacts": [other_role]}, [bir()], TODAY))
+    assert c["accounting_contact"]["detail"] == "no Contact with Contact of = Accounting"
+    by_position = {**ACCOUNTING, "roles": {"Position_Role": "Accounting Manager"}}
+    c = checks_of(assess({**SNAPSHOT, "_contacts": [by_position]}, [bir()], TODAY))
+    assert c["accounting_contact"]["status"] == "PASS"
+
+
+def test_tin_in_zoho_differing_from_bir_fails():
+    a = assess({**SNAPSHOT, "Tax_Identification_Number_TIN": "999-999-999-00000"},
+               [bir(), dti(), permit()], TODAY)
+    assert checks_of(a)["tin"]["status"] in ("AFTER_UPDATE", "FAIL")
+    assert checks_of(a)["tin"]["detail"] != ""
+
+
+def _high(doc):
+    for v in doc.fields.values():
+        v.update(confidence=0.98, grounding="EXACT")
+    return doc
+
+
+def test_auto_activation_needs_every_check():
+    from app.assessment.alerts import status_decision
+    docs = [_high(bir()), _high(dti()), _high(permit())]
+    a = assess({**SNAPSHOT, "Tax_Identification_Number_TIN": "123-456-789-00000"}, docs, TODAY)
+    assert a["recommendation"] == "ACTIVE"
+    assert status_decision(a, None, 0.95)[0] == "ACTIVATE"
+    # same documents, but no Accounting contact: not activated, reason given
+    a = assess({**SNAPSHOT, "Tax_Identification_Number_TIN": "123-456-789-00000",
+                "_contacts": []}, docs, TODAY)
+    decision, why = status_decision(a, None, 0.95)
+    assert a["recommendation"] == "MANUAL_REVIEW" and decision == "NO_CHANGE"
+    assert "Accounting contact" in a["reasons"][0]

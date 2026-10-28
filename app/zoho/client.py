@@ -26,6 +26,8 @@ ATTACHMENT_FIELDS = (
     "id,File_Name,File_Size,Created_Time,Modified_Time,Owner,Created_By,Modified_By,"
     "Parent_Id,Attachment_Type"
 )
+CONTACT_FIELDS = ("Full_Name,First_Name,Last_Name,Email,Mobile,Phone,Department,Position_Role,"
+                  "Contact_Category,Contact_of")
 NOTE_FIELDS = (
     "id,Parent_Id,Owner,Created_By,Modified_By,Created_Time,Modified_Time,Note_Title,"
     "Note_Content,$attachments"
@@ -138,6 +140,11 @@ class ZohoClient:
     def list_attachments(self, module: str, record_id: str) -> list[dict[str, Any]]:
         return list(self._paginate(f"/{module}/{record_id}/Attachments",
                                    {"fields": ATTACHMENT_FIELDS}))
+
+    def list_contacts(self, account_id: str, fields: str = CONTACT_FIELDS
+                      ) -> list[dict[str, Any]]:
+        """GET /Accounts/{id}/Contacts (needs ZohoCRM.modules.contacts.READ)."""
+        return list(self._paginate(f"/Accounts/{account_id}/Contacts", {"fields": fields}))
 
     def list_notes(self, module: str, record_id: str) -> list[dict[str, Any]]:
         return list(self._paginate(f"/{module}/{record_id}/Notes", {"fields": NOTE_FIELDS}))

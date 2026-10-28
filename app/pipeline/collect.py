@@ -28,7 +28,7 @@ from app.pipeline.sources import MODULE, SourceRef, discover_sources  # noqa: F4
 from app.services.audit import record_event
 from app.storage.base import Storage, storage_key_for
 from app.zoho.client import ZohoClient
-from app.zoho.errors import FileTooLargeError, ZohoAPIError, ZohoTransientError
+from app.zoho.errors import FileTooLargeError, ZohoAPIError, ZohoError, ZohoTransientError
 
 log = logging.getLogger(__name__)
 def build_snapshot(account: dict[str, Any], fields: list[str]) -> dict[str, Any]:
@@ -75,6 +75,31 @@ def _store_file(db: Session, storage: Storage, data: bytes, sha: str, ext: str, 
     db.flush()
 
 
+def _contact_summary(c: dict[str, Any]) -> dict[str, Any]:
+    from app.assessment.policy import CONTACT_ROLE_FIELDS
+    name = c.get("Full_Name") or " ".join(
+        x for x in (c.get("First_Name"), c.get("Last_Name")) if x) or None
+    return {"id": str(c.get("id") or ""), "name": name, "email": c.get("Email"),
+            "mobile": c.get("Mobile"), "phone": c.get("Phone"),
+            "roles": {f: c[f] for f in CONTACT_ROLE_FIELDS if c.get(f) not in (None, "")}}
+
+
+def _contacts(db: Session, job: VerificationJob, client: ZohoClient,
+              sent: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
+    """The Account's Contacts (for the Accounting-contact check): from the button, else Zoho.
+    None = could not be read (the check then fails with that reason)."""
+    if sent is not None:
+        return [_contact_summary(c) for c in sent]
+    from app.zoho.client import CONTACT_FIELDS
+    for fields in (CONTACT_FIELDS, CONTACT_FIELDS.replace(",Contact_of", "")):
+        try:
+            return [_contact_summary(c) for c in client.list_contacts(job.account_id, fields)]
+        except ZohoError as exc:
+            last = exc
+    add_warning(job, "CONTACTS_UNREADABLE", f"Contacts could not be read: {last}"[:300])
+    return None
+
+
 def collect_job(
     db: Session,
     job: VerificationJob,
@@ -92,6 +117,7 @@ def collect_job(
     # instead of calling Zoho again. Otherwise: GET /crm/v8/Accounts/{account_id}
     account = sent.get("account") or client.get_record(MODULE, job.account_id)
     job.account_snapshot = build_snapshot(account, settings.zoho_snapshot_fields)
+    job.account_snapshot["_contacts"] = _contacts(db, job, client, sent.get("contacts"))
     zoho_number = account.get("Inventory_Customer_Number")
     if job.customer_number and zoho_number and job.customer_number != zoho_number:
         add_warning(job, "CUSTOMER_NUMBER_MISMATCH",

@@ -84,6 +84,10 @@ class FakeZoho:
             return httpx.Response(self.fail_next.pop(0), json={"code": "ERR"})
 
         base = "/crm/v8"
+        if request.method == "GET" and path == f"{base}/Accounts/{ACCOUNT_ID}/Contacts":
+            data = getattr(self, "contacts", None) or []
+            return httpx.Response(200, json={"data": data, "info": {"more_records": False}}) \
+                if data else httpx.Response(204)
         if request.method == "PUT" and path == f"{base}/Accounts":
             body = json.loads(request.content)
             self.updates.append(body)
