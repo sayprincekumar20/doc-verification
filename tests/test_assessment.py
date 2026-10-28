@@ -232,6 +232,7 @@ def test_not_cod_means_manual_review():
 
 def test_cod_spellings():
     from app.assessment.policy import is_cod
+    assert is_cod("Cash On Delivery")              # the production picklist value
     assert is_cod("COD") and is_cod("Cash on Delivery") and is_cod("C.O.D".replace(".", ""))
     assert not is_cod("Net 30") and not is_cod("CODE 7") and not is_cod(None)
 

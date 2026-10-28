@@ -83,7 +83,8 @@ AUTO_APPLY_GROUNDINGS = {"EXACT", "CROSS_CHECKED"}
 
 # ---------------- Activation checks (rules-1.2) ----------------
 # Payment Terms (Accounts.Credit_Terms) values meaning Cash on Delivery: matched as whole words,
-# case-insensitive. Only COD accounts are verified (the button checks this first).
+# case-insensitive. Production value: "Cash On Delivery" (confirmed 2026-10-28). Only COD
+# accounts are verified (the button checks this first).
 COD_PAYMENT_TERMS = ("COD", "CASH ON DELIVERY")
 # The Accounting contact: a Contact of the Account whose "Contact of" says Accounting. Fields
 # are tried in order (production "Contact of" first; sandbox has Position_Role / Department).
