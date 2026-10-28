@@ -13,7 +13,9 @@ _ADDRESS_ABBREVIATIONS = {
     "BRG": "BARANGAY", "ST": "STREET", "AVE": "AVENUE", "AV": "AVENUE", "RD": "ROAD",
     "PH": "PHASE", "SUBD": "SUBDIVISION", "VILL": "VILLAGE", "BLDG": "BUILDING",
     "FLR": "FLOOR", "EXT": "EXTENSION", "STO": "SANTO", "STA": "SANTA", "GEN": "GENERAL",
-    "PROV": "PROVINCE", "MUN": "MUNICIPALITY",
+    "PROV": "PROVINCE", "MUN": "MUNICIPALITY", "FL": "FLOOR",
+    # single letters before a number: "L2 B3 P1" = LOT 2 BLOCK 3 PHASE 1
+    "L": "LOT", "B": "BLOCK", "P": "PHASE",
 }
 _ADDRESS_FILLER = {"BARANGAY", "CITY", "OF", "PROVINCE", "MUNICIPALITY", "PHILIPPINES", "THE",
                    "DISTRICT", "NCR", "REGION", "AND"}
@@ -27,7 +29,19 @@ def _tokens(text: str) -> list[str]:
     return re.findall(r"[A-Z0-9]+", text)
 
 
+_REGION_ALIASES = [
+    (re.compile(r"NATIONAL\s+CAPITAL\s+REGION\s*\(?\s*MANILA\s*\)?"), " NCR "),
+    (re.compile(r"NATIONAL\s+CAPITAL\s+REGION"), " NCR "),
+    (re.compile(r"METRO\s+MANILA"), " NCR "),
+    (re.compile(r"\b(FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH)\s+DISTRICT\b"), " "),
+    (re.compile(r"\b(\d+)\s*(ST|ND|RD|TH)\b"), r" \1 "),     # 2ND FLR -> 2 FLR
+]
+
+
 def address_tokens(text: str) -> list[str]:
+    text = str(text).upper()
+    for pattern, repl in _REGION_ALIASES:
+        text = pattern.sub(repl, text)
     out = []
     for tok in _tokens(text):
         tok = _ADDRESS_ABBREVIATIONS.get(tok, tok)

@@ -82,7 +82,8 @@ def _contact_summary(c: dict[str, Any]) -> dict[str, Any]:
     return {"id": str(c.get("id") or ""), "name": name, "email": c.get("Email"),
             "mobile": c.get("Mobile"), "phone": c.get("Phone"),
             "primary": any(c.get(f) in (True, "true", "True") for f in PRIMARY_CONTACT_FIELDS),
-            "roles": {f: c[f] for f in CONTACT_ROLE_FIELDS if c.get(f) not in (None, "")}}
+            "roles": {f: (", ".join(map(str, c[f])) if isinstance(c[f], list) else c[f])
+                      for f in CONTACT_ROLE_FIELDS if c.get(f) not in (None, "", [])}}
 
 
 def _contacts(db: Session, job: VerificationJob, client: ZohoClient,
@@ -92,9 +93,14 @@ def _contacts(db: Session, job: VerificationJob, client: ZohoClient,
     if sent is not None:
         return [_contact_summary(c) for c in sent]
     from app.zoho.client import CONTACT_FIELDS
-    # Fields that may not exist in every org are dropped on a retry (Zoho rejects unknown ones).
-    base = CONTACT_FIELDS.replace(",Contact_of", "").replace(",Account_Primary_Contact", "")
-    for fields in (CONTACT_FIELDS, base, base.replace(",Primary_Contact", "")):
+    # Fields that may not exist in every org are dropped on a retry (Zoho rejects unknown ones):
+    # production has Contact_of / Account_Primary_Contact, the sandbox has Primary_Contact.
+    def without(*names: str) -> str:
+        return ",".join(f for f in CONTACT_FIELDS.split(",") if f not in names)
+    attempts = (CONTACT_FIELDS, without("Primary_Contact"),
+                without("Contact_of", "Account_Primary_Contact", "Contact_Type"),
+                without("Primary_Contact", "Contact_of", "Account_Primary_Contact", "Contact_Type"))
+    for fields in attempts:
         try:
             return [_contact_summary(c) for c in client.list_contacts(job.account_id, fields)]
         except ZohoError as exc:

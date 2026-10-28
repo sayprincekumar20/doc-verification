@@ -424,12 +424,18 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
 
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
-PLACEHOLDER_EMAILS = ("fakeemail", "emailnotfound", "noemail", "none@", "na@", "test@")
+# Placeholders typed when the customer gave no email: "fakeemail@...", "emailnotfound@...",
+# or a whole local part like "na@..." / "none@..." (but "ana@..." is a real address).
+_PLACEHOLDER_PARTS = ("fakeemail", "emailnotfound", "noemail", "nomail")
+_PLACEHOLDER_LOCALS = {"na", "n/a", "none", "test", "email", "no", "x", "xx", "xxx", "null"}
 
 
 def _real_email(value) -> bool:
     v = str(value or "").strip().lower()
-    return bool(_EMAIL_RE.match(v)) and not any(p in v for p in PLACEHOLDER_EMAILS)
+    if not _EMAIL_RE.match(v):
+        return False
+    local = v.split("@", 1)[0]
+    return local not in _PLACEHOLDER_LOCALS and not any(p in local for p in _PLACEHOLDER_PARTS)
 
 
 def _proposal_for(proposals: list[dict], field: str) -> dict | None:
@@ -506,9 +512,12 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
                             "Invoice_Company_Name", snap.get("Invoice_Company_Name"),
                             _best(facts[name_attr]) or _best(facts["business_name"]),
                             lambda a, b: match_business(a, b) or DIFFERENT, proposals))
-    address = ", ".join(str(snap[f]) for f in ("Billing_Street", "Billing_City",
-                                               "Billing_Province", "Billing_Code")
-                        if snap.get(f) not in (None, "", "-None-"))
+    city = snap.get("Billing_City") or (snap.get("Billing_City1") or {}).get("name") \
+        if isinstance(snap.get("Billing_City1"), dict) else snap.get("Billing_City")
+    address = ", ".join(str(v) for v in (snap.get("Billing_Street"), city,
+                                         snap.get("Billing_Province") or snap.get("Billing_State"),
+                                         snap.get("Billing_Code"))
+                        if v not in (None, "", "-None-"))
     out.append(_field_check("billing_address", "Billing Address matches the documents",
                             "Billing_Street", address or None, _best(facts["address"]),
                             lambda a, b: match_address(a, b) or DIFFERENT, proposals))

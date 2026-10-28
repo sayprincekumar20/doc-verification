@@ -89,10 +89,11 @@ COD_PAYMENT_TERMS = ("COD", "CASH ON DELIVERY")
 # The Accounting contact: a Contact of the Account whose "Contact of" says Accounting. Fields
 # are tried in order (production "Contact of" first; sandbox has Position_Role / Department).
 CONTACT_ROLE_FIELDS = ("Contact_of", "Contact_Of", "Contact_Type", "Department",
-                       "Position_Role", "Contact_Category")
+                       "Position_Role", "Contact_Category")   # Contact_of is a multi-select
 ACCOUNTING_ROLE = "ACCOUNTING"
 # ...or the Account's primary contact (checkbox; production: Account_Primary_Contact).
 PRIMARY_CONTACT_FIELDS = ("Account_Primary_Contact", "Primary_Contact")
+# (Vendor_Primary_Contact is for Vendors and does not count.)
 
 
 def is_cod(payment_terms) -> bool:
