@@ -423,19 +423,18 @@ def assess(snapshot: dict, docs: list[DocInput], today: date) -> dict:
     }
 
 
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
-# Placeholders typed when the customer gave no email: "fakeemail@...", "emailnotfound@...",
-# or a whole local part like "na@..." / "none@..." (but "ana@..." is a real address).
-_PLACEHOLDER_PARTS = ("fakeemail", "emailnotfound", "noemail", "nomail")
-_PLACEHOLDER_LOCALS = {"na", "n/a", "none", "test", "email", "no", "x", "xx", "xxx", "null"}
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+'-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$")
 
 
-def _real_email(value) -> bool:
-    v = str(value or "").strip().lower()
-    if not _EMAIL_RE.match(v):
-        return False
-    local = v.split("@", 1)[0]
-    return local not in _PLACEHOLDER_LOCALS and not any(p in local for p in _PLACEHOLDER_PARTS)
+def email_format_ok(value) -> bool:
+    """Format only (name@domain.tld): what the sales team entered is accepted as given."""
+    return bool(_EMAIL_RE.match(str(value or "").strip()))
+
+
+def _contact_mobile(c: dict) -> tuple[str | None, str | None]:
+    """(raw value, '+63 9XX XXX XXXX' or None): the Mobile field, else the Phone field."""
+    raw = c.get("mobile") or c.get("phone")
+    return raw, policy.ph_mobile(raw)
 
 
 def _proposal_for(proposals: list[dict], field: str) -> dict | None:
@@ -480,22 +479,25 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
     else:
         eligible = [c for c in contacts if c.get("primary") or any(
             policy.ACCOUNTING_ROLE in str(v).upper() for v in (c.get("roles") or {}).values())]
-        complete = [c for c in eligible if c.get("name") and policy.ph_mobile(c.get("mobile"))
-                    and _real_email(c.get("email"))]
+        complete = [c for c in eligible if c.get("name") and _contact_mobile(c)[1]
+                    and email_format_ok(c.get("email"))]
         if complete:
             c = complete[0]
             status = "PASS"
-            detail = (f"{c['name']}, {policy.ph_mobile(c['mobile'])}, {c['email']}"
+            detail = (f"{c['name']}, {_contact_mobile(c)[1]}, {str(c['email']).strip()}"
                       + (" (primary contact)" if c.get("primary") else " (Accounting)"))
         elif eligible:
             c = eligible[0]
+            raw_mobile, _ = _contact_mobile(c)
             missing = []
             if not c.get("name"):
                 missing.append("a name")
-            if not policy.ph_mobile(c.get("mobile")):
-                missing.append(f"a Philippine mobile number (has {c.get('mobile') or 'none'})")
-            if not _real_email(c.get("email")):
-                missing.append(f"a real email (has {c.get('email') or 'none'})")
+            if not _contact_mobile(c)[1]:
+                missing.append("a mobile number in Philippine format, e.g. 0917 123 4567 "
+                               f"(has {raw_mobile or 'none'})")
+            if not email_format_ok(c.get("email")):
+                missing.append("an email in a valid format, e.g. name@company.com "
+                               f"(has {c.get('email') or 'none'})")
             status, detail = "FAIL", f"{c.get('name') or 'The contact'} needs " \
                                      + " and ".join(missing)
         else:

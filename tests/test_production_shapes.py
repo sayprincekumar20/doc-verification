@@ -58,10 +58,11 @@ def test_production_shaped_corporation_passes_every_activation_check():
     assert "+63 917 123 4567" in checks["accounting_contact"]["detail"]
 
 
-def test_placeholder_emails_but_not_real_names():
-    from app.assessment.assess import _real_email
-    for real in ("ana@examplecafe.ph", "donna.cruz@gmail.com", "none.reyes@shop.ph"):
-        assert _real_email(real), real
-    for fake in ("fakeemail@gmail.com", "emailnotfound@rare.com", "na@gmail.com",
-                 "none@yahoo.com", "test@test.com", "noemail123@gmail.com", "not an email"):
-        assert not _real_email(fake), fake
+def test_email_is_checked_for_format_only():
+    from app.assessment.assess import email_format_ok
+    for ok in ("ana@examplecafe.ph", "donna.cruz@gmail.com", "fakeemail@gmail.com",
+               "na@gmail.com", "accounting+ap@shop.com.ph", " spaced@shop.ph "):
+        assert email_format_ok(ok), ok
+    for bad in ("not an email", "ana@", "@shop.ph", "ana@shop", "ana shop@x.ph", "", None,
+                "ana@@shop.ph"):
+        assert not email_format_ok(bad), bad

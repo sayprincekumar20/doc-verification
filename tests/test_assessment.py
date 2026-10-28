@@ -238,10 +238,13 @@ def test_cod_spellings():
 
 
 def test_accounting_contact_needs_name_mobile_and_real_email():
-    bad = {**ACCOUNTING, "email": "fakeemail@gmail.com"}
+    bad = {**ACCOUNTING, "email": "maria at juanmeat"}
     a = assess({**SNAPSHOT, "_contacts": [bad]}, [bir(), dti(), permit()], TODAY)
     c = checks_of(a)["accounting_contact"]
-    assert c["status"] == "FAIL" and "real email" in c["detail"]
+    assert c["status"] == "FAIL" and "email in a valid format" in c["detail"]
+    entered = {**ACCOUNTING, "email": "fakeemail@gmail.com"}   # format ok: accepted as given
+    c = checks_of(assess({**SNAPSHOT, "_contacts": [entered]}, [bir()], TODAY))
+    assert c["accounting_contact"]["status"] == "PASS"
     other_role = {**ACCOUNTING, "roles": {"Contact_of": "Purchasing"}}
     c = checks_of(assess({**SNAPSHOT, "_contacts": [other_role]}, [bir()], TODAY))
     assert c["accounting_contact"]["detail"].startswith("no Contact with Contact of = Accounting")
@@ -262,7 +265,12 @@ def test_mobile_must_be_a_philippine_mobile():
     landline = {**ACCOUNTING, "mobile": "(02) 8123 4567"}
     c = checks_of(assess({**SNAPSHOT, "_contacts": [landline]}, [bir()], TODAY))
     assert c["accounting_contact"]["status"] == "FAIL"
-    assert "Philippine mobile number (has (02) 8123 4567)" in c["accounting_contact"]["detail"]
+    assert "Philippine format" in c["accounting_contact"]["detail"]
+    assert "(has (02) 8123 4567)" in c["accounting_contact"]["detail"]
+    in_phone_field = {**ACCOUNTING, "mobile": None, "phone": "0917 765 4321"}
+    c = checks_of(assess({**SNAPSHOT, "_contacts": [in_phone_field]}, [bir()], TODAY))
+    assert c["accounting_contact"]["status"] == "PASS"
+    assert "+63 917 765 4321" in c["accounting_contact"]["detail"]
 
 
 def test_ph_mobile_formats():

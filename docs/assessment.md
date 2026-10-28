@@ -91,7 +91,7 @@ Besides valid, consistent documents, an Account becomes **Active automatically**
 | Check | Passes when |
 | --- | --- |
 | Payment Terms is COD | `Credit_Terms` is "COD" / "Cash on Delivery" (the button also refuses non-COD accounts) |
-| Accounting or primary contact | a Contact of the Account with "Contact of" (or Department / Position / Category) = Accounting, **or** marked as the primary contact (`Account_Primary_Contact` / `Primary_Contact` = true), with a name, a Philippine mobile number (09XX XXX XXXX / +63 9XX XXX XXXX; shown as +63 9XX XXX XXXX) and a real email (no placeholder) |
+| Accounting or primary contact | a Contact of the Account with "Contact of" (or Department / Position / Category) = Accounting, **or** marked as the primary contact (`Account_Primary_Contact` / `Primary_Contact` = true), with a name, a mobile number in Philippine format (Mobile, or Phone if Mobile is empty: 09XX XXX XXXX / +63 9XX XXX XXXX; shown as +63 9XX XXX XXXX) and an email in a valid format. Values are taken as the sales team entered them: only the format is checked, on the qualifying contact only |
 | TIN | the Account's TIN equals the BIR 2303 TIN (format ignored), or it is filled/corrected automatically in the same run |
 | Invoice Company Name | matches the registered name (corporations) / business name, or is filled automatically |
 | Billing Address | Street + City + Province + Code match the BIR 2303 address, or an empty address is filled automatically |
