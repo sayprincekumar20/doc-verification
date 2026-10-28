@@ -91,7 +91,7 @@ Besides valid, consistent documents, an Account becomes **Active automatically**
 | Check | Passes when |
 | --- | --- |
 | Payment Terms is COD | `Credit_Terms` is "COD" / "Cash on Delivery" (the button also refuses non-COD accounts) |
-| Accounting contact | a Contact of the Account with "Contact of" (or Department / Position / Category) = Accounting, with a name, a mobile number (10+ digits) and a real email (no placeholder) |
+| Accounting or primary contact | a Contact of the Account with "Contact of" (or Department / Position / Category) = Accounting, **or** marked as the primary contact (`Account_Primary_Contact` / `Primary_Contact` = true), with a name, a Philippine mobile number (09XX XXX XXXX / +63 9XX XXX XXXX; shown as +63 9XX XXX XXXX) and a real email (no placeholder) |
 | TIN | the Account's TIN equals the BIR 2303 TIN (format ignored), or it is filled/corrected automatically in the same run |
 | Invoice Company Name | matches the registered name (corporations) / business name, or is filled automatically |
 | Billing Address | Street + City + Province + Code match the BIR 2303 address, or an empty address is filled automatically |
@@ -99,4 +99,4 @@ Besides valid, consistent documents, an Account becomes **Active automatically**
 "Automatically" = the update passes the auto-apply rules (confidence >= 0.95, OCR-confirmed).
 A check that is not met makes the recommendation MANUAL_REVIEW; the review record lists every
 check (OK / AFTER UPDATE / NOT MET) under "Activation checks". The values and field names are in
-`app/assessment/policy.py` (COD_PAYMENT_TERMS, CONTACT_ROLE_FIELDS, ACCOUNTING_ROLE).
+`app/assessment/policy.py` (COD_PAYMENT_TERMS, CONTACT_ROLE_FIELDS, ACCOUNTING_ROLE, PRIMARY_CONTACT_FIELDS, ph_mobile).

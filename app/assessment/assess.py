@@ -432,10 +432,6 @@ def _real_email(value) -> bool:
     return bool(_EMAIL_RE.match(v)) and not any(p in v for p in PLACEHOLDER_EMAILS)
 
 
-def _mobile_ok(value) -> bool:
-    return len(re.sub(r"\D", "", str(value or ""))) >= 10
-
-
 def _proposal_for(proposals: list[dict], field: str) -> dict | None:
     return next((p for p in proposals if p["zoho_field"] == field), None)
 
@@ -472,26 +468,35 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
                 "detail": f"Payment Terms: {terms or 'empty'}"})
 
     contacts = snap.get("_contacts")
+    label = "Accounting or primary contact (name, PH mobile, email)"
     if contacts is None:
         status, detail = "FAIL", "Contacts could not be read"
     else:
-        accounting = [c for c in contacts if any(
+        eligible = [c for c in contacts if c.get("primary") or any(
             policy.ACCOUNTING_ROLE in str(v).upper() for v in (c.get("roles") or {}).values())]
-        complete = [c for c in accounting if c.get("name") and _mobile_ok(c.get("mobile"))
+        complete = [c for c in eligible if c.get("name") and policy.ph_mobile(c.get("mobile"))
                     and _real_email(c.get("email"))]
         if complete:
-            status, detail = "PASS", f"{complete[0]['name']} ({complete[0]['email']})"
-        elif accounting:
-            c = accounting[0]
-            missing = [n for n, ok in (("name", bool(c.get("name"))),
-                                       ("mobile", _mobile_ok(c.get("mobile"))),
-                                       ("email", _real_email(c.get("email")))) if not ok]
-            status, detail = "FAIL", f"{c.get('name') or 'Accounting contact'} has no " \
-                                     f"valid {', '.join(missing)}"
+            c = complete[0]
+            status = "PASS"
+            detail = (f"{c['name']}, {policy.ph_mobile(c['mobile'])}, {c['email']}"
+                      + (" (primary contact)" if c.get("primary") else " (Accounting)"))
+        elif eligible:
+            c = eligible[0]
+            missing = []
+            if not c.get("name"):
+                missing.append("a name")
+            if not policy.ph_mobile(c.get("mobile")):
+                missing.append(f"a Philippine mobile number (has {c.get('mobile') or 'none'})")
+            if not _real_email(c.get("email")):
+                missing.append(f"a real email (has {c.get('email') or 'none'})")
+            status, detail = "FAIL", f"{c.get('name') or 'The contact'} needs " \
+                                     + " and ".join(missing)
         else:
-            status, detail = "FAIL", "no Contact with Contact of = Accounting"
-    out.append({"key": "accounting_contact", "label": "Accounting contact (name, mobile, email)",
-                "status": status, "field": None, "detail": detail})
+            status, detail = "FAIL", ("no Contact with Contact of = Accounting or marked as the "
+                                      "primary contact")
+    out.append({"key": "accounting_contact", "label": label, "status": status, "field": None,
+                "detail": detail})
 
     out.append(_field_check("tin", "TIN matches the BIR 2303", "Tax_Identification_Number_TIN",
                             snap.get("Tax_Identification_Number_TIN"), _best(facts["tin"]),

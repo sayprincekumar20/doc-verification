@@ -27,7 +27,7 @@ ATTACHMENT_FIELDS = (
     "Parent_Id,Attachment_Type"
 )
 CONTACT_FIELDS = ("Full_Name,First_Name,Last_Name,Email,Mobile,Phone,Department,Position_Role,"
-                  "Contact_Category,Contact_of")
+                  "Contact_Category,Primary_Contact,Contact_of,Account_Primary_Contact")
 NOTE_FIELDS = (
     "id,Parent_Id,Owner,Created_By,Modified_By,Created_Time,Modified_Time,Note_Title,"
     "Note_Content,$attachments"

@@ -76,11 +76,12 @@ def _store_file(db: Session, storage: Storage, data: bytes, sha: str, ext: str, 
 
 
 def _contact_summary(c: dict[str, Any]) -> dict[str, Any]:
-    from app.assessment.policy import CONTACT_ROLE_FIELDS
+    from app.assessment.policy import CONTACT_ROLE_FIELDS, PRIMARY_CONTACT_FIELDS
     name = c.get("Full_Name") or " ".join(
         x for x in (c.get("First_Name"), c.get("Last_Name")) if x) or None
     return {"id": str(c.get("id") or ""), "name": name, "email": c.get("Email"),
             "mobile": c.get("Mobile"), "phone": c.get("Phone"),
+            "primary": any(c.get(f) in (True, "true", "True") for f in PRIMARY_CONTACT_FIELDS),
             "roles": {f: c[f] for f in CONTACT_ROLE_FIELDS if c.get(f) not in (None, "")}}
 
 
@@ -91,7 +92,9 @@ def _contacts(db: Session, job: VerificationJob, client: ZohoClient,
     if sent is not None:
         return [_contact_summary(c) for c in sent]
     from app.zoho.client import CONTACT_FIELDS
-    for fields in (CONTACT_FIELDS, CONTACT_FIELDS.replace(",Contact_of", "")):
+    # Fields that may not exist in every org are dropped on a retry (Zoho rejects unknown ones).
+    base = CONTACT_FIELDS.replace(",Contact_of", "").replace(",Account_Primary_Contact", "")
+    for fields in (CONTACT_FIELDS, base, base.replace(",Primary_Contact", "")):
         try:
             return [_contact_summary(c) for c in client.list_contacts(job.account_id, fields)]
         except ZohoError as exc:

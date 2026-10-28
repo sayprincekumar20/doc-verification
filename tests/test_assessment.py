@@ -240,13 +240,38 @@ def test_accounting_contact_needs_name_mobile_and_real_email():
     bad = {**ACCOUNTING, "email": "fakeemail@gmail.com"}
     a = assess({**SNAPSHOT, "_contacts": [bad]}, [bir(), dti(), permit()], TODAY)
     c = checks_of(a)["accounting_contact"]
-    assert c["status"] == "FAIL" and "email" in c["detail"]
+    assert c["status"] == "FAIL" and "real email" in c["detail"]
     other_role = {**ACCOUNTING, "roles": {"Contact_of": "Purchasing"}}
     c = checks_of(assess({**SNAPSHOT, "_contacts": [other_role]}, [bir()], TODAY))
-    assert c["accounting_contact"]["detail"] == "no Contact with Contact of = Accounting"
+    assert c["accounting_contact"]["detail"].startswith("no Contact with Contact of = Accounting")
     by_position = {**ACCOUNTING, "roles": {"Position_Role": "Accounting Manager"}}
     c = checks_of(assess({**SNAPSHOT, "_contacts": [by_position]}, [bir()], TODAY))
     assert c["accounting_contact"]["status"] == "PASS"
+
+
+def test_primary_contact_counts_too():
+    primary = {**ACCOUNTING, "roles": {"Contact_of": "Purchasing"}, "primary": True}
+    c = checks_of(assess({**SNAPSHOT, "_contacts": [primary]}, [bir()], TODAY))
+    assert c["accounting_contact"]["status"] == "PASS"
+    assert c["accounting_contact"]["detail"].endswith("(primary contact)")
+    assert "+63 917 123 4567" in c["accounting_contact"]["detail"]
+
+
+def test_mobile_must_be_a_philippine_mobile():
+    landline = {**ACCOUNTING, "mobile": "(02) 8123 4567"}
+    c = checks_of(assess({**SNAPSHOT, "_contacts": [landline]}, [bir()], TODAY))
+    assert c["accounting_contact"]["status"] == "FAIL"
+    assert "Philippine mobile number (has (02) 8123 4567)" in c["accounting_contact"]["detail"]
+
+
+def test_ph_mobile_formats():
+    from app.assessment.policy import ph_mobile
+    for v in ("09171234567", "0917 123 4567", "0917-123-4567", "+639171234567",
+              "+63 917 123 4567", "639171234567", "9171234567"):
+        assert ph_mobile(v) == "+63 917 123 4567", v
+    for v in ("(02) 8123 4567", "0817 123 4567", "0917123456", "091712345678", "", None,
+              "tel 0917 123 4567"):
+        assert ph_mobile(v) is None, v
 
 
 def test_tin_in_zoho_differing_from_bir_fails():
@@ -273,4 +298,4 @@ def test_auto_activation_needs_every_check():
                 "_contacts": []}, docs, TODAY)
     decision, why = status_decision(a, None, 0.95)
     assert a["recommendation"] == "MANUAL_REVIEW" and decision == "NO_CHANGE"
-    assert "Accounting contact" in a["reasons"][0]
+    assert "Accounting or primary contact" in a["reasons"][0]

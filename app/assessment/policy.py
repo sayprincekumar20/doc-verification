@@ -90,8 +90,26 @@ COD_PAYMENT_TERMS = ("COD", "CASH ON DELIVERY")
 CONTACT_ROLE_FIELDS = ("Contact_of", "Contact_Of", "Contact_Type", "Department",
                        "Position_Role", "Contact_Category")
 ACCOUNTING_ROLE = "ACCOUNTING"
+# ...or the Account's primary contact (checkbox; production: Account_Primary_Contact).
+PRIMARY_CONTACT_FIELDS = ("Account_Primary_Contact", "Primary_Contact")
 
 
 def is_cod(payment_terms) -> bool:
     text = " ".join(str(payment_terms or "").upper().replace("-", " ").split())
     return any(re.search(rf"\b{re.escape(t)}\b", text) for t in COD_PAYMENT_TERMS)
+
+
+def ph_mobile(value) -> str | None:
+    """Philippine mobile number in the standard format '+63 9XX XXX XXXX', or None.
+    Accepts 09XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX, 9XXXXXXXXX (spaces, dashes, dots ok)."""
+    raw = str(value or "").strip()
+    if not raw or re.search(r"[^\d\s+().-]", raw):
+        return None
+    digits = re.sub(r"\D", "", raw)
+    if digits.startswith("63") and len(digits) == 12:
+        digits = digits[2:]
+    elif digits.startswith("0") and len(digits) == 11:
+        digits = digits[1:]
+    if len(digits) != 10 or not digits.startswith("9"):
+        return None
+    return f"+63 {digits[:3]} {digits[3:6]} {digits[6:]}"
