@@ -140,58 +140,127 @@ def humanize(text: str) -> str:
     return text.replace(" -> ", ": ")
 
 
+def _short(doc_type: str | None) -> str:
+    from app.assessment.alerts import label
+    return SHORT_LABELS.get(doc_type or "", label(doc_type) if doc_type else "Document")
+
+
+_CONFLICT = re.compile(r"Documents disagree on (?P<attr>[^:]+): (?P<values>.+)")
+_VALUE_TYPE = re.compile(r"(?P<value>.+?) \((?P<type>[A-Z0-9_]+)\)$")
+
+
+def _conflict_text(message: str) -> str | None:
+    """'Documents disagree on tin: A (BIR_2303) vs B (BIR_2303)' ->
+    'TIN differs between documents: A vs B' (document names kept only when they differ)."""
+    m = _CONFLICT.match(message)
+    if not m:
+        return None
+    parts = [_VALUE_TYPE.match(v.strip()) for v in m.group("values").split(" vs ")]
+    if all(parts):
+        types = {p.group("type") for p in parts}
+        shown = [p.group("value") if len(types) == 1 else
+                 f"{p.group('value')} ({_short(p.group('type'))})" for p in parts]
+    else:
+        shown = [humanize(v.strip()) for v in m.group("values").split(" vs ")]
+    attr = humanize(m.group("attr"))
+    return f"{attr[:1].upper() + attr[1:]} differs between documents: {' vs '.join(shown)}"
+
+
 def format_alerts(alerts: list[dict]) -> str:
+    """One line per alert: what is wrong, then what to do."""
     lines = []
     for i, a in enumerate(alerts, 1):
-        lines.append(f"{i}. {_SEVERITY.get(a.get('severity'), a.get('severity'))}: "
-                     f"{humanize(str(a.get('message', '')))}")
-        if a.get("action"):
-            lines.append(f"   Action: {humanize(str(a['action']))}")
+        code, doc, msg = a.get("code"), _short(a.get("document_type")), str(a.get("message", ""))
+        if code == "MISSING_DOCUMENT":
+            text = f"{doc} missing. Collect it from the customer."
+        elif code == "EXPIRED_DOCUMENT":
+            text = humanize(msg.split(" expired on ", 1)[-1])
+            text = f"{doc} expired on {text}. Collect the renewed one."
+        elif code == "EXPIRING_SOON":
+            text = humanize(msg.split(" expires on ", 1)[-1])
+            text = f"{doc} expires on {text}. Remind the customer to renew."
+        elif code == "DOCUMENT_CONFLICT":
+            text = (_conflict_text(msg) or humanize(msg)) + \
+                ". Check the documents belong to this customer."
+        elif code == "FIELDS_NEED_REVIEW":
+            n = len(msg.split(":", 1)[-1].split(","))
+            text = f"{n} field{'s' if n != 1 else ''} need a person's check (see Proposed Changes)."
+        elif code == "UNREADABLE_DOCUMENT":
+            text = humanize(msg) + ". Ask for a clearer photo or a supported file."
+        else:
+            text = humanize(msg) + (f". {humanize(str(a['action']))}." if a.get("action") else ".")
+        lines.append(f"{i}. {_SEVERITY.get(a.get('severity'), a.get('severity'))}: {text}")
     return "\n".join(lines)
 
 
 def format_requirements(requirements: list[dict]) -> str:
-    from app.assessment.alerts import label
+    """One line per document: tick or cross, status, file."""
     lines = []
     for r in requirements:
         status, until = r.get("status"), r.get("valid_until")
-        if status == "VALID":
-            text = f"Valid until {_date(until)}" if until else "Valid"
-        elif status == "EXPIRED":
-            text = f"EXPIRED on {_date(until)}"
-        elif status == "MISSING":
-            text = "MISSING (not uploaded)"
-        elif status == "NO_EXPIRY":
-            text = "Valid (" + (r.get("valid_until_source") or "no expiry date") + ")"
-        elif status == "NOT_YET_VALID":
-            text = "Not yet valid"
-        else:
-            text = "Expiry date could not be determined"
-        file = f"\n   File: {short_name(r['file'])}" if r.get("file") else ""
-        lines.append(f"- {label(r['document_type'])}: {text}{file}")
+        mark, text = {
+            "VALID": ("✓", f"valid until {_date(until)}" if until else "valid"),
+            "EXPIRED": ("✗", f"EXPIRED on {_date(until)}"),
+            "MISSING": ("✗", "MISSING"),
+            "NO_EXPIRY": ("✓", "valid (" + (r.get("valid_until_source")
+                                             or "no expiry date") + ")"),
+            "NOT_YET_VALID": ("✗", "not yet valid"),
+        }.get(status, ("?", "expiry date unknown"))
+        file = f" - {short_name(r['file'])}" if r.get("file") else ""
+        lines.append(f"{mark} {_short(r['document_type'])}: {text}{file}")
     return "\n".join(lines)
 
 
-_CHECK_WORD = {"PASS": "OK", "AFTER_UPDATE": "AFTER UPDATE", "FAIL": "NOT MET"}
+_CHECK_SHORT = {"payment_terms": "COD", "accounting_contact": "Contact", "tin": "TIN",
+                "invoice_name": "Invoice name", "billing_address": "Address"}
+_REASON_RULES = [
+    (re.compile(r"Required document missing: (\w+)"), lambda m: f"{_short(m[1])} missing"),
+    (re.compile(r"Required document expired: (\w+) \(until ([\d-]+)\)"),
+     lambda m: f"{_short(m[1])} expired on {_date(m[2])}"),
+    (re.compile(r"Activation check not met: (.+?) - "), lambda m: "Activation check not met: "
+     + next((v for k, v in _CHECK_SHORT.items() if _CHECK_LABEL.get(k) == m[1]), m[1])),
+]
+_CHECK_LABEL: dict[str, str] = {}
+
+
+def _short_reason(reason: str) -> str:
+    conflict = _conflict_text(reason)
+    if conflict:
+        return conflict
+    for pattern, fmt in _REASON_RULES:
+        m = pattern.match(reason)
+        if m:
+            return fmt(m)
+    return humanize(reason)
 
 
 def format_reasons(recommendation: str, reasons: list[str], status: dict | None,
                    checks: list[dict] | None = None) -> str:
-    lines = [f"Recommendation: {recommendation.replace('_', ' ')}", "Why:"]
-    lines += [f"{i}. {humanize(r)}" for i, r in enumerate(reasons, 1)]
+    """Recommendation and why (one line each), activation checks at a glance, status."""
+    for c in checks or []:
+        _CHECK_LABEL[c["key"]] = c["label"]
+    lines = [f"{recommendation.replace('_', ' ')} because:"]
+    lines += [f"- {_short_reason(r)}" for r in dict.fromkeys(reasons)]
     if checks:
-        lines += ["", "Activation checks:"]
-        lines += [f"- {_CHECK_WORD.get(c['status'], c['status'])}: {c['label']} "
-                  f"({humanize(str(c['detail']))})" for c in checks]
+        met = [c for c in checks if c["status"] == "PASS"]
+        lines += ["", f"Activation checks: {len(met)} of {len(checks)} met"]
+        if met:
+            lines.append("  " + " · ".join(f"✓ {_CHECK_SHORT.get(c['key'], c['label'])}"
+                                          for c in met))
+        for c in checks:
+            name = _CHECK_SHORT.get(c["key"], c["label"])
+            if c["status"] == "FAIL":
+                lines.append(f"  ✗ {name}: {humanize(str(c['detail']))}")
+            elif c["status"] == "AFTER_UPDATE":
+                lines.append(f"  ~ {name}: {humanize(str(c['detail']))} "
+                             f"(counts once the update is applied)")
     if status:
-        if status["decision"] == "ACTIVATE":
-            line = "set to Active automatically."
-        elif status["decision"] == "ALREADY_ACTIVE":
-            line = "already Active (no change)."
-        elif status["reason"].startswith("Recommendation is"):
-            line = "not changed (a person decides after the review)."
-        else:
-            line = f"not changed. {humanize(status['reason'])}"
+        line = {"ACTIVATE": "set to Active automatically.",
+                "ALREADY_ACTIVE": "already Active."}.get(status["decision"])
+        if line is None:
+            line = "not changed - a reviewer decides." \
+                if status["reason"].startswith("Recommendation is") else \
+                f"not changed - {_short_reason(status['reason'])}"
         lines += ["", f"Customer Status: {line}"]
     return "\n".join(lines)
 
