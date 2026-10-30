@@ -44,23 +44,25 @@ class ApplyResult:
     status: str | None = None      # Applied | Conflict | Failed (None in dry run)
     error: str | None = None
     activated: bool | None = None  # reviewer ticked Activate Account: True set / False failed
+    notes: list[str] = field(default_factory=list)
 
 
 def _norm(v) -> str:
     return "" if v in (None, "") else " ".join(str(v).split()).upper()
 
 
-def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
-                 names: dict | None = None, triggers: list[str] | None = None) -> ApplyResult:
-    names = names or load_names()
-    f, sf, module = names["fields"], names["subform_fields"], names["module"]
-    account = review.get(f["Account"]) or {}
-    result = ApplyResult(str(review.get("id")), account.get("id"))
-    rows = review.get(f["Proposed Changes"]) or []
-
+def apply_rows(client: ZohoClient, account_id: str | None, rows: list[dict], *,
+               dry_run: bool = True, triggers: list[str] | None = None,
+               activate: bool = False, review_id: str = "") -> ApplyResult:
+    """Write approved rows to the Account, safely. Each row: id, zoho_field, decision,
+    value (proposed or edited), current_value (as seen when the review was made).
+    Only Approve / Edit rows of writable fields; a field changed in Zoho since the review is a
+    CONFLICT. activate=True (reviewer's decision) then sets Customer Status = Active, never
+    after a failed write. Used by the Zoho review module and the dashboard review API."""
+    result = ApplyResult(review_id, account_id)
     for row in rows:
-        r = RowResult(str(row.get("id")), row.get(sf["Zoho Field"]) or "",
-                      row.get(sf["Decision"]), row.get(sf["Proposed Value"]))
+        r = RowResult(str(row.get("id")), row.get("zoho_field") or "", row.get("decision"),
+                      row.get("value"))
         if r.decision not in APPROVED:
             r.detail = f"Decision {r.decision or 'empty'}: not written"
         elif r.zoho_field not in WRITABLE_FIELDS:
@@ -71,11 +73,11 @@ def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
             r.outcome = "WRITE"
         result.rows.append(r)
 
-    if not result.account_id:
-        result.error = "Review record has no Account"
+    if not account_id:
+        result.error = "Review has no Account"
         return result
     try:
-        current = client.get_record("Accounts", result.account_id)
+        current = client.get_record("Accounts", account_id)
     except ZohoError as exc:
         result.error = f"Could not read the Account: {exc}"
         return result
@@ -83,10 +85,10 @@ def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
     for r, row in zip(result.rows, rows, strict=True):
         if r.outcome != "WRITE":
             continue
-        if _norm(current.get(r.zoho_field)) != _norm(row.get(sf["Current Value"])):
+        if _norm(current.get(r.zoho_field)) != _norm(row.get("current_value")):
             r.outcome = "CONFLICT"
             r.detail = (f"Account now has {current.get(r.zoho_field)!r}, review expected "
-                        f"{row.get(sf['Current Value'])!r}")
+                        f"{row.get('current_value')!r}")
         else:
             to_write[r.zoho_field] = r.value
     if dry_run:
@@ -94,7 +96,7 @@ def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
 
     if to_write:
         try:
-            client.update_record("Accounts", result.account_id, to_write, triggers)
+            client.update_record("Accounts", account_id, to_write, triggers)
             for r in result.rows:
                 if r.outcome == "WRITE":
                     r.outcome, r.detail = "APPLIED", "Written to the Account"
@@ -106,6 +108,43 @@ def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
     outcomes = {r.outcome for r in result.rows}
     result.status = ("Failed" if "FAILED" in outcomes else
                      "Conflict" if "CONFLICT" in outcomes else "Applied")
+    result.notes = [f"{r.zoho_field}: {r.outcome} - {r.detail}" for r in result.rows
+                    if r.outcome not in ("NOT_APPROVED",)]
+    if activate:
+        if result.status == "Failed":
+            result.activated = False
+            result.notes.append("Account NOT activated: the field update failed")
+        else:
+            try:
+                client.update_record("Accounts", account_id,
+                                     {"Customer_Status": ACTIVE_VALUE}, triggers)
+                result.activated = True
+                result.notes.append("Customer Status set to Active (reviewer decision)")
+            except ZohoError as exc:
+                result.activated = False
+                result.notes.append(f"Activation failed: {str(exc)[:300]}")
+    return result
+
+
+def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
+                 names: dict | None = None, triggers: list[str] | None = None) -> ApplyResult:
+    """Zoho 'Document Verifications' record: apply its approved rows, then write the outcome
+    back to the record (status, per-row Auto Applied, Reviewer Notes)."""
+    names = names or load_names()
+    f, sf, module = names["fields"], names["subform_fields"], names["module"]
+    account = review.get(f["Account"]) or {}
+    rows = review.get(f["Proposed Changes"]) or []
+    result = apply_rows(
+        client, account.get("id"),
+        [{"id": row.get("id"), "zoho_field": row.get(sf["Zoho Field"]),
+          "decision": row.get(sf["Decision"]), "value": row.get(sf["Proposed Value"]),
+          "current_value": row.get(sf["Current Value"])} for row in rows],
+        dry_run=dry_run, triggers=triggers, review_id=str(review.get("id")),
+        activate=bool(review.get(f.get("Activate Account", "Activate_Account"))))
+    if result.error and result.error.startswith("Review has no Account"):
+        result.error = "Review record has no Account"
+    if dry_run or result.status is None:
+        return result
 
     # Write back the per-row outcome. All rows are sent with their ids: Zoho replaces the
     # subform with the rows in the request, so leaving one out would delete it.
@@ -118,26 +157,10 @@ def apply_review(client: ZohoClient, review: dict, *, dry_run: bool = True,
     if not review.get(f.get("Reviewed Time", "Reviewed_Time")):
         update[f.get("Reviewed Time", "Reviewed_Time")] = \
             datetime.now(UTC).replace(microsecond=0).isoformat()
-    notes = [f"{r.zoho_field}: {r.outcome} - {r.detail}" for r in result.rows
-             if r.outcome not in ("NOT_APPROVED",)]
-    # The reviewer decides activation (checkbox in the Approve transition); never on a failure.
-    if review.get(f.get("Activate Account", "Activate_Account")):
-        if result.status == "Failed":
-            result.activated = False
-            notes.append("Account NOT activated: the field update failed")
-        else:
-            try:
-                client.update_record("Accounts", result.account_id,
-                                     {"Customer_Status": ACTIVE_VALUE}, triggers)
-                result.activated = True
-                notes.append("Customer Status set to Active (reviewer decision)")
-            except ZohoError as exc:
-                result.activated = False
-                notes.append(f"Activation failed: {str(exc)[:300]}")
-    if notes:
+    if result.notes:
         update[f.get("Reviewer Notes", "Reviewer_Notes")] = "\n".join(
             filter(None, [review.get(f.get("Reviewer Notes", "Reviewer_Notes")),
-                          "Write-back:", *notes]))[:2000]
+                          "Write-back:", *result.notes]))[:2000]
     try:
         client.update_record(module, result.review_id, update, triggers)
     except ZohoError as exc:

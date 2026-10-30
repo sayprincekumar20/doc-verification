@@ -300,3 +300,36 @@ class Notification(Base):
     account_id: Mapped[str | None] = mapped_column(String(32), index=True)
     payload: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Review(Base):
+    """A review done in the Accounts dashboard (ENGINE_REVIEWS=true) instead of the Zoho module.
+    status: Pending Review | In Review | Applied | Conflict | Failed | Rejected |
+    Waiting for Documents | No Action. rows: the proposed changes with decisions and outcomes;
+    pages: copies of the page images kept for the reviewer (removed 30 days after closing)."""
+
+    __tablename__ = "reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    number: Mapped[int] = mapped_column(BigInteger, unique=True)          # DV-<number>
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("verification_jobs.id", ondelete="CASCADE"), unique=True)
+    account_id: Mapped[str] = mapped_column(String(32), index=True)
+    account_name: Mapped[str | None] = mapped_column(String(255))
+    customer_number: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    recommendation: Mapped[str] = mapped_column(String(20))
+    summary: Mapped[dict] = mapped_column(JSON)
+    rows: Mapped[list] = mapped_column(JSON)
+    pages: Mapped[list] = mapped_column(JSON)
+    requested_by: Mapped[str | None] = mapped_column(String(255))
+    reviewer: Mapped[str | None] = mapped_column(String(255))
+    reviewer_notes: Mapped[str | None] = mapped_column(Text)
+    values_compared: Mapped[bool] = mapped_column(default=False)
+    activate_account: Mapped[bool] = mapped_column(default=False)
+    activated: Mapped[bool | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow,
+                                                 onupdate=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    images_purged: Mapped[bool] = mapped_column(default=False)

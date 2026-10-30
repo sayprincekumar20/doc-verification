@@ -71,6 +71,11 @@ class Settings(BaseSettings):
 
     # Pull mode: the Verify Account button only marks the Account in Zoho; the engine polls for
     # marked Accounts (no inbound connection to the engine needed: works behind any router).
+    # ---- Reviews in the Accounts dashboard (engine review API) ----
+    engine_reviews: bool = False             # create a review in the engine for the dashboard
+    review_image_days: int = 30              # keep review page images N days after closing
+    dashboard_origins: str = ""              # comma list for browser calls (CORS); empty = off
+
     # ---- Notifications: Zoho Cliq channel + Google Sheets log (both optional) ----
     # Cliq: channel message endpoint + webhook token (Cliq > Bots & Tools > Webhook Tokens)
     cliq_message_url: str = ""      # https://cliq.zoho.com/company/<id>/api/v2/channelsbyname/<channel>/message

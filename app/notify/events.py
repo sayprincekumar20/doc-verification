@@ -207,6 +207,44 @@ def _announce_review(db, client, notifier, rec, status, f, sf) -> None:
         notifier.rows("Activations", [[now, name, acc_id, number, reviewer, dv]])
 
 
+def notify_engine_review(db: Session, review, notifier: Notifier) -> None:
+    """A decision taken in the Accounts dashboard (engine review API)."""
+    ref = f"engine:{review.id}:{review.status}"
+    if not notifier.enabled or already_sent(db, "review", ref):
+        return
+    dv, name, who = f"DV-{review.number}", review.account_name or review.account_id, \
+        review.reviewer or "the reviewer"
+    decided = [r for r in review.rows if r["decision"] in ("Approve", "Edit")]
+    applied = [r for r in decided if r.get("outcome") == "APPLIED"]
+    skipped = [r for r in decided if r.get("outcome") in ("CONFLICT", "FAILED")]
+    if review.status in ("Rejected", "Waiting for Documents"):
+        text = (f"{'🚫' if review.status == 'Rejected' else '📄'} {dv} for {name}: "
+                f"{review.status.lower()} by {who}. {review.reviewer_notes or ''}").strip()
+    elif review.status == "Failed":
+        text = f"❌ {dv} for {name}: the write-back failed. See the review in the dashboard."
+    else:
+        labels = [r.get("field_label") or r["zoho_field"] for r in applied]
+        text = (f"👍 {dv} approved by {who} for {name}: {len(applied)} field(s) updated"
+                + (f" ({', '.join(labels)})" if labels else ""))
+        if skipped:
+            text += f"; {len(skipped)} not written (the Account had changed: Conflict)"
+    if review.activated:
+        text += "\nCustomer Status → Active (reviewer decision)"
+    notifier.message(text)
+    now = manila_now()
+    notifier.rows("Field Updates", [[
+        now, dv, name, review.account_id, r.get("field_label") or r["zoho_field"],
+        r.get("current_value") or "",
+        (r.get("edited_value") if r["decision"] == "Edit" else r.get("proposed_value")) or "",
+        r.get("confidence") or "", f"Approved by {who}",
+        {"APPLIED": "Applied", "CONFLICT": "Conflict"}.get(r.get("outcome"), "Failed")]
+        for r in applied + skipped])
+    if review.activated:
+        notifier.rows("Activations", [[now, name, review.account_id,
+                                       review.customer_number or "", who, dv]])
+    mark_sent(db, "review", ref, review.account_id, {"status": review.status})
+
+
 # ------------------------------------------------------------------ 3. expiry reminders
 def _levels(settings) -> list[int]:
     return sorted({int(x) for x in str(settings.expiry_alert_days).split(",") if x.strip()})

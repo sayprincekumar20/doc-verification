@@ -16,6 +16,7 @@ from app.pipeline.collect import collect_job
 from app.pipeline.extract import extract_job, extraction_version, manila_today
 from app.pipeline.read import read_job
 from app.pipeline.review_record import create_review_record
+from app.review.engine import create_engine_review
 from app.services.audit import record_event
 from app.storage.base import build_storage
 from app.workers.celery_app import celery_app
@@ -136,6 +137,8 @@ def extract_documents(self, job_id: str) -> str:
             if s.create_review_records:
                 create_review_record(db, job, get_zoho_client(), build_storage(s),
                                      s.review_max_images)  # Phase 3
+            if s.engine_reviews:   # review in the Accounts dashboard
+                create_engine_review(db, job, build_storage(s), s.review_max_images)
             if s.notify_verifications:
                 try:  # Cliq message + Google Sheet rows; never fails the job
                     notify_verification(db, job, Notifier.from_settings(s), get_zoho_client())

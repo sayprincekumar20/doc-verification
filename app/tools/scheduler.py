@@ -18,8 +18,10 @@ from app.db.session import session_scope
 from app.logging import setup_logging
 from app.notify.events import check_expiry, notify_applied_reviews
 from app.notify.notifier import MANILA, Notifier
+from app.review.engine import purge_old_review_images
 from app.services.request_poller import poll_once
 from app.services.review_applier import apply_approved
+from app.storage.base import build_storage
 from app.zoho.factory import get_zoho_client
 
 log = logging.getLogger("app.scheduler")
@@ -34,6 +36,7 @@ def run_due(now: float, last: dict, settings, client, enqueue, notifier=None) ->
         if done:
             log.info("Applied %d approved review(s)", len(done))
     if notifier and notifier.enabled and settings.notify_reviews and \
+            settings.create_review_records and \
             now - last.get("review_notes", 0) >= settings.review_apply_interval_seconds:
         last["review_notes"] = now
         with session_scope() as db:
@@ -45,6 +48,10 @@ def run_due(now: float, last: dict, settings, client, enqueue, notifier=None) ->
         with session_scope() as db:
             done = check_expiry(db, client, notifier, settings, enqueue, manila.date())
         log.info("Expiry check: %s", done)
+    if settings.engine_reviews and last.get("purge_day") != manila.date():
+        last["purge_day"] = manila.date()
+        with session_scope() as db:
+            purge_old_review_images(db, build_storage(settings), settings.review_image_days)
     if settings.request_polling and now - last.get("requests", 0) >= \
             settings.poll_interval_seconds:
         last["requests"] = now
