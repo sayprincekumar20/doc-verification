@@ -9,9 +9,8 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
     # ./samples (real test documents, git-ignored) and .env are mounted for the test tools
-    volumes: ["files:/data/files", "./samples:/app/samples", "./.env:/app/.env:ro"]
+    volumes: ["./secrets:/run/secrets:ro", "files:/data/files", "./samples:/app/samples", "./.env:/app/.env:ro"]
     restart: unless-stopped
-
   worker:
     build: .
     env_file: ${ENGINE_ENV_FILE:-.env}
@@ -20,9 +19,8 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
-    volumes: ["files:/data/files"]
+    volumes: ["./secrets:/run/secrets:ro", "files:/data/files"]
     restart: unless-stopped
-
   scheduler:
     build: .
     env_file: ${ENGINE_ENV_FILE:-.env}
@@ -31,7 +29,8 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
     restart: unless-stopped
-
+    volumes:
+      - ./secrets:/run/secrets:ro
   migrate:
     build: .
     env_file: ${ENGINE_ENV_FILE:-.env}

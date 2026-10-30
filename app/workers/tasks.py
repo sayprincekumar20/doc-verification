@@ -7,6 +7,8 @@ from app.db.models import JobStatus, VerificationJob
 from app.db.session import session_scope
 from app.extraction.providers import TransientExtractionError, build_provider
 from app.logging import setup_logging
+from app.notify.events import notify_verification
+from app.notify.notifier import Notifier
 from app.pipeline.assess import assess_job
 from app.pipeline.auto_apply import auto_apply_job
 from app.pipeline.cleanup import purge_job_files
@@ -134,6 +136,11 @@ def extract_documents(self, job_id: str) -> str:
             if s.create_review_records:
                 create_review_record(db, job, get_zoho_client(), build_storage(s),
                                      s.review_max_images)  # Phase 3
+            if s.notify_verifications:
+                try:  # Cliq message + Google Sheet rows; never fails the job
+                    notify_verification(db, job, Notifier.from_settings(s), get_zoho_client())
+                except Exception:  # noqa: BLE001
+                    log.exception("Notification failed", extra={"job_id": job_id})
             status = job.status
         _cleanup(jid)  # page images are in the review record; delete local copies
         return status

@@ -37,10 +37,9 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
-    volumes: ["files:/data/files"]
+    volumes: ["./secrets:/run/secrets:ro", "files:/data/files"]
     expose: ["8000"]          # not published: only Caddy (HTTPS) reaches it
     restart: unless-stopped
-
   worker:
     build: .
     env_file: .env
@@ -49,9 +48,8 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
-    volumes: ["files:/data/files"]   # temporary working copies only
+    volumes: ["./secrets:/run/secrets:ro", "files:/data/files"]   # temporary working copies only
     restart: unless-stopped
-
   scheduler:
     build: .
     env_file: .env
@@ -60,7 +58,8 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_started }
     restart: unless-stopped
-
+    volumes:
+      - ./secrets:/run/secrets:ro
   caddy:
     image: caddy:2
     environment:

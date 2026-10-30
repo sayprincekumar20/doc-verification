@@ -13,3 +13,6 @@ samples/
 # Other environments (sandbox etc.) hold secrets too
 .env.*
 !.env.example
+
+# private keys (Google service account etc.)
+secrets/

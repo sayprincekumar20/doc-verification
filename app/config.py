@@ -71,6 +71,20 @@ class Settings(BaseSettings):
 
     # Pull mode: the Verify Account button only marks the Account in Zoho; the engine polls for
     # marked Accounts (no inbound connection to the engine needed: works behind any router).
+    # ---- Notifications: Zoho Cliq channel + Google Sheets log (both optional) ----
+    # Cliq: channel message endpoint + webhook token (Cliq > Bots & Tools > Webhook Tokens)
+    cliq_message_url: str = ""      # https://cliq.zoho.com/company/<id>/api/v2/channelsbyname/<channel>/message
+    cliq_webhook_token: str = ""
+    # Google Sheets: spreadsheet id + service-account key (file path or the JSON itself)
+    google_sheet_id: str = ""
+    google_service_account_file: str = ""
+    google_service_account_json: str = ""
+    notify_verifications: bool = True        # Cliq message + row for every verification
+    notify_reviews: bool = True              # approved / applied reviews (checked by the scheduler)
+    expiry_alert_days: str = "30,7,0"        # reminder levels (days before expiry)
+    expiry_check_hour: int = 8               # daily expiry check, Manila time
+    zoho_crm_web_url: str = ""               # e.g. https://crm.zoho.com/crm/org824163551 (links)
+
     request_polling: bool = False                      # pull mode off unless switched on
     poll_interval_seconds: int = 60
     # Approved reviews in Zoho are applied to their Accounts by the scheduler every N seconds.

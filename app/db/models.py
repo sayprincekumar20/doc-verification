@@ -285,3 +285,18 @@ class AccountAlert(Base):
     zoho_task_id: Mapped[str | None] = mapped_column(String(32))
     detail: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Notification(Base):
+    """Every Cliq message / Sheet entry the engine sent, so none is ever sent twice.
+    kind: verification | review | expiry | renewed; ref: what it is about (unique per kind)."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (UniqueConstraint("kind", "ref", name="uq_notification_kind_ref"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(20))
+    ref: Mapped[str] = mapped_column(String(300))
+    account_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    payload: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -23,6 +23,7 @@ dependencies = [
   "pymupdf>=1.24",
   "pytesseract>=0.3.10",
   "openpyxl>=3.1",
+  "pyjwt[crypto]>=2.8",   # Google service-account login for the Sheets log
 ]
 
 [project.optional-dependencies]
