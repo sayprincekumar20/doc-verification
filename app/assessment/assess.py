@@ -478,7 +478,8 @@ def activation_checks(snap: dict, facts: dict, proposals: list[dict], form: str)
         status, detail = "FAIL", "Contacts could not be read"
     else:
         eligible = [c for c in contacts if c.get("primary") or any(
-            policy.ACCOUNTING_ROLE in str(v).upper() for v in (c.get("roles") or {}).values())]
+            role in str(v).upper() for v in (c.get("roles") or {}).values()
+            for role in policy.ACCOUNTING_ROLES)]
         complete = [c for c in eligible if c.get("name") and _contact_mobile(c)[1]
                     and email_format_ok(c.get("email"))]
         if complete:

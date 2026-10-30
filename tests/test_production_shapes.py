@@ -66,3 +66,13 @@ def test_email_is_checked_for_format_only():
     for bad in ("not an email", "ana@", "@shop.ph", "ana@shop", "ana shop@x.ph", "", None,
                 "ana@@shop.ph"):
         assert not email_format_ok(bad), bad
+
+
+def test_production_contact_of_spelling_accouting_counts():
+    from app.assessment.assess import activation_checks
+    contact = _contact_summary({**CONTACT, "Contact_of": ["Accouting"],
+                                "Account_Primary_Contact": False})
+    checks = activation_checks({"Credit_Terms": "Cash On Delivery", "_contacts": [contact]},
+                               {"tin": [], "registered_name": [], "business_name": [],
+                                "address": []}, [], "CORPORATION")
+    assert next(c for c in checks if c["key"] == "accounting_contact")["status"] == "PASS"

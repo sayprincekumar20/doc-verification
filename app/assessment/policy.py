@@ -91,6 +91,8 @@ COD_PAYMENT_TERMS = ("COD", "CASH ON DELIVERY")
 CONTACT_ROLE_FIELDS = ("Contact_of", "Contact_Of", "Contact_Type", "Department",
                        "Position_Role", "Contact_Category")   # Contact_of is a multi-select
 ACCOUNTING_ROLE = "ACCOUNTING"
+# Production's "Contact of" picklist spells it "Accouting" (field export 2026-10-29): both count.
+ACCOUNTING_ROLES = ("ACCOUNTING", "ACCOUTING")
 # ...or the Account's primary contact (checkbox; production: Account_Primary_Contact).
 PRIMARY_CONTACT_FIELDS = ("Account_Primary_Contact", "Primary_Contact")
 # (Vendor_Primary_Contact is for Vendors and does not count.)
